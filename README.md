@@ -105,6 +105,7 @@ This project follows strict TDD principles:
 ### Test Coverage
 - **Story Validation**: 28 tests covering input validation, business rules
 - **Story Service**: 20 tests covering CRUD operations, error handling
+- **Story Creation Form**: 11 tests covering UI validation, form behavior, Server Actions
 - **Type Definitions**: Comprehensive type safety validation
 - **Test Utilities**: Mock data factories and database helpers
 
@@ -113,6 +114,8 @@ This project follows strict TDD principles:
 ```
 src/
 ├── app/                 # Next.js App Router pages
+│   ├── actions/         # Server Actions for client-server communication
+│   └── stories/         # Story-related routes (/stories, /stories/new)
 ├── components/          # Reusable React components
 ├── lib/                 # Utilities and configurations
 │   ├── story-validation.ts
@@ -133,11 +136,14 @@ supabase/
 ### ✅ U1: Story Creation
 *As a creator, I open `localhost:3000`, click "New Story", enter a headline, 1–2 sentences, and source URLs.*
 
-**Status**: Backend complete, UI in progress
+**Status**: Complete
 - ✅ Story validation with business rules
 - ✅ Database operations and error handling
 - ✅ Input sanitization and URL validation
-- 🚧 Story creation form UI
+- ✅ Story creation form UI (`/stories/new`)
+- ✅ Server Actions integration for client-server communication
+- ✅ Form validation with real-time error feedback
+- ✅ Multi-source URL input support
 - 🚧 Story dashboard and listing
 
 ### 🚧 U2: Script Editing  

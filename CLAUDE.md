@@ -163,17 +163,21 @@ A generated video file must:
 - **Story Service**: Full CRUD operations with error handling (`src/services/story-service.ts`)
 - **Database Schema**: Supabase migrations with proper relationships
 - **Type Safety**: Complete TypeScript definitions with test coverage
+- **User Story U1**: Complete story creation form with Server Actions (`/stories/new`)
+  - Form validation with real-time error feedback
+  - Multi-source URL input support
+  - Server Action integration for database operations
+  - Success navigation to script editing
 
 ### 🚧 Active Development Areas
 - **Story Dashboard UI**: `/stories` route implementation needed
-- **Story Creation Form**: `/stories/new` form component needed
 - **Script Generation**: OpenAI integration for User Story U2
 
 ### 📋 Next Priority Tasks
-1. Implement story creation form UI component
-2. Build story dashboard with status filtering
-3. Add OpenAI script generation service
-4. Create script editing interface
+1. Build story dashboard with status filtering (`/stories`)
+2. Add OpenAI script generation service
+3. Create script editing interface (`/stories/[id]/script`)
+4. Implement TTS and video generation pipeline
 
 ## Development Workflow
 
@@ -185,8 +189,8 @@ A generated video file must:
 4. **Validate**: Ensure all tests pass
 
 ### Current Test Status
-- **48 passing tests** across validation and service layers
-- **Story creation (U1)**: ✅ Complete backend testing
+- **77 passing tests** across validation, service, and UI layers
+- **Story creation (U1)**: ✅ Complete with full-stack testing (backend + UI)
 - **Script generation (U2)**: 🚧 Tests needed next
 - **Video generation (U3)**: 📋 Not started
 
