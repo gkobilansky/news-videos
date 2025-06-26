@@ -219,6 +219,13 @@ export class StoryService {
   }
 
   /**
+   * Gets all stories without filters
+   */
+  async getAllStories(): Promise<Story[]> {
+    return this.listStories()
+  }
+
+  /**
    * Gets stories by status with convenience method
    */
   async getStoriesByStatus(status: StoryStatus): Promise<Story[]> {

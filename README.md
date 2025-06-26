@@ -6,13 +6,13 @@ A self-hosted Next.js application that converts headlines and source links into 
 
 ### ✅ Completed (TDD Foundation)
 - **Environment Setup**: Next.js 15 + TypeScript + Tailwind CSS
-- **Testing Framework**: Jest + React Testing Library with 48 passing tests
+- **Testing Framework**: Jest + React Testing Library with 87 passing tests
 - **Database**: Supabase Postgres with migrations and schema
 - **Story Management**: Complete CRUD operations with validation
-- **User Story U1**: Story creation form foundation ready
+- **User Story U1**: Story creation form with Server Actions
+- **Story Dashboard**: Complete `/stories` route with filtering and Server Actions
 
 ### 🚧 In Progress
-- Story dashboard UI components
 - Script generation with OpenAI integration (User Story U2)
 
 ### 📋 Roadmap
@@ -106,6 +106,7 @@ This project follows strict TDD principles:
 - **Story Validation**: 28 tests covering input validation, business rules
 - **Story Service**: 20 tests covering CRUD operations, error handling
 - **Story Creation Form**: 11 tests covering UI validation, form behavior, Server Actions
+- **Story Dashboard**: 12 tests covering list display, filtering, loading/error states
 - **Type Definitions**: Comprehensive type safety validation
 - **Test Utilities**: Mock data factories and database helpers
 
@@ -144,7 +145,7 @@ supabase/
 - ✅ Server Actions integration for client-server communication
 - ✅ Form validation with real-time error feedback
 - ✅ Multi-source URL input support
-- 🚧 Story dashboard and listing
+- ✅ Story dashboard with status filtering (`/stories`)
 
 ### 🚧 U2: Script Editing  
 *As a creator, I can review/edit the AI-drafted ≤45-word script in the web UI before rendering.*

@@ -169,15 +169,21 @@ A generated video file must:
   - Server Action integration for database operations
   - Success navigation to script editing
 
+### ✅ Recently Completed Features  
+- **Story Dashboard UI**: Complete `/stories` route with:
+  - Status filtering (All, Draft, Editing, Generating, Done, Failed)
+  - Server Actions integration to avoid client-side Supabase issues
+  - Clean list layout with creation dates and source counts
+  - Loading states, error handling with retry functionality
+  - Responsive design with proper hover states
+
 ### 🚧 Active Development Areas
-- **Story Dashboard UI**: `/stories` route implementation needed
 - **Script Generation**: OpenAI integration for User Story U2
 
 ### 📋 Next Priority Tasks
-1. Build story dashboard with status filtering (`/stories`)
-2. Add OpenAI script generation service
-3. Create script editing interface (`/stories/[id]/script`)
-4. Implement TTS and video generation pipeline
+1. Add OpenAI script generation service
+2. Create script editing interface (`/stories/[id]/script`)
+3. Implement TTS and video generation pipeline
 
 ## Development Workflow
 
@@ -189,8 +195,9 @@ A generated video file must:
 4. **Validate**: Ensure all tests pass
 
 ### Current Test Status
-- **77 passing tests** across validation, service, and UI layers
+- **87 passing tests** across validation, service, and UI layers
 - **Story creation (U1)**: ✅ Complete with full-stack testing (backend + UI)
+- **Story dashboard**: ✅ Complete with 12 comprehensive tests covering all states
 - **Script generation (U2)**: 🚧 Tests needed next
 - **Video generation (U3)**: 📋 Not started
 
@@ -200,3 +207,9 @@ A generated video file must:
 - Use existing mock factories from `src/lib/test-utils.tsx`
 - Follow established patterns in `src/services/story-service.ts`
 - All business logic must have corresponding tests before UI implementation
+- **Review git history** (`git log --oneline`) to understand recent changes and project evolution
+
+## Debugging Notes
+
+- **Supabase Client Initialization**: 
+  - Use server actions to avoid Error: supabaseKey is required when calling supabase from client
