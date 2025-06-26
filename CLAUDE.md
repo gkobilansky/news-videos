@@ -155,6 +155,44 @@ A generated video file must:
 4. Have proper captions synchronized with audio
 5. Include appropriate b-roll footage relevant to the headline
 
+## Current Development Status
+
+### ✅ Completed Features
+- **TDD Foundation**: Complete testing framework with Jest + React Testing Library
+- **Story Validation**: Comprehensive input validation with business rules (`src/lib/story-validation.ts`)
+- **Story Service**: Full CRUD operations with error handling (`src/services/story-service.ts`)
+- **Database Schema**: Supabase migrations with proper relationships
+- **Type Safety**: Complete TypeScript definitions with test coverage
+
+### 🚧 Active Development Areas
+- **Story Dashboard UI**: `/stories` route implementation needed
+- **Story Creation Form**: `/stories/new` form component needed
+- **Script Generation**: OpenAI integration for User Story U2
+
+### 📋 Next Priority Tasks
+1. Implement story creation form UI component
+2. Build story dashboard with status filtering
+3. Add OpenAI script generation service
+4. Create script editing interface
+
+## Development Workflow
+
+### Test-First Approach
+**CRITICAL**: Always follow TDD for new features:
+1. **Red**: Write failing tests first
+2. **Green**: Implement minimal code to pass
+3. **Refactor**: Improve code quality
+4. **Validate**: Ensure all tests pass
+
+### Current Test Status
+- **48 passing tests** across validation and service layers
+- **Story creation (U1)**: ✅ Complete backend testing
+- **Script generation (U2)**: 🚧 Tests needed next
+- **Video generation (U3)**: 📋 Not started
+
 ## Project Guidance
 
 - Testing is a core component of this project. Always start with testing
+- Use existing mock factories from `src/lib/test-utils.tsx`
+- Follow established patterns in `src/services/story-service.ts`
+- All business logic must have corresponding tests before UI implementation
