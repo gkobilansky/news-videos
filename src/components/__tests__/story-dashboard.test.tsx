@@ -1,7 +1,7 @@
 import { render, screen, waitFor, act } from '@/lib/test-utils'
 import { StoryDashboard } from '../story-dashboard'
 import { createMockStory } from '@/lib/test-utils'
-import { Story } from '@/types/story'
+import { Story } from '@/types'
 
 // Mock the story actions
 jest.mock('@/app/actions/story-actions', () => ({

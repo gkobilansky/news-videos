@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { getAllStoriesAction } from '@/app/actions/story-actions'
-import { Story, StoryStatus } from '@/types/story'
+import { Story, StoryStatus } from '@/types'
 
 const STATUS_STYLES: Record<StoryStatus, string> = {
   draft: 'bg-gray-100 text-gray-800',

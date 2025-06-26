@@ -170,6 +170,14 @@ A generated video file must:
   - Success navigation to script editing
 
 ### ✅ Recently Completed Features  
+- **User Story U2**: Complete OpenAI script generation with editing interface (`/stories/[id]/script`)
+  - AI-powered script generation using `gpt-4o-mini` with specialized RAG prompts
+  - Real-time word count validation (≤45 words for 10-15 second videos)
+  - Script editing interface with save/regenerate functionality
+  - Server Actions integration for client-safe database access
+  - Comprehensive error handling and loading states
+  - Full test coverage (27 tests) for both service layer and UI components
+
 - **Story Dashboard UI**: Complete `/stories` route with:
   - Status filtering (All, Draft, Editing, Generating, Done, Failed)
   - Server Actions integration to avoid client-side Supabase issues
@@ -178,12 +186,12 @@ A generated video file must:
   - Responsive design with proper hover states
 
 ### 🚧 Active Development Areas
-- **Script Generation**: OpenAI integration for User Story U2
+- **Video Generation Pipeline**: TTS and video assembly for User Story U3
 
 ### 📋 Next Priority Tasks
-1. Add OpenAI script generation service
-2. Create script editing interface (`/stories/[id]/script`)
-3. Implement TTS and video generation pipeline
+1. Implement TTS service with OpenAI `tts-1` model
+2. Add video generation with Runway Gen-3 integration
+3. Create video assembly pipeline with ffmpeg
 
 ## Development Workflow
 
@@ -195,10 +203,10 @@ A generated video file must:
 4. **Validate**: Ensure all tests pass
 
 ### Current Test Status
-- **87 passing tests** across validation, service, and UI layers
+- **116 total tests** (114 passing, 2 skipped) across validation, service, and UI layers
 - **Story creation (U1)**: ✅ Complete with full-stack testing (backend + UI)
 - **Story dashboard**: ✅ Complete with 12 comprehensive tests covering all states
-- **Script generation (U2)**: 🚧 Tests needed next
+- **Script generation (U2)**: ✅ Complete with 27 tests covering service logic and UI interactions
 - **Video generation (U3)**: 📋 Not started
 
 ## Project Guidance
@@ -213,3 +221,7 @@ A generated video file must:
 
 - **Supabase Client Initialization**: 
   - Use server actions to avoid Error: supabaseKey is required when calling supabase from client
+- **Using Actions to Access DB from Client**:
+  - Prefer server actions to handle database interactions from the client side
+  - Ensures secure and consistent database access
+  - Helps avoid client-side Supabase initialization errors
