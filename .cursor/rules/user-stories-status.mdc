@@ -1,0 +1,66 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# User Stories & Feature Status
+
+## User Story Implementation Status
+
+### ✅ U1: Story Creation (Complete)
+*As a creator, I open `localhost:3000`, click "New Story", enter a headline, 1–2 sentences, and source URLs.*
+
+**Implementation:**
+- Route: [src/app/stories/new/page.tsx](mdc:src/app/stories/new/page.tsx)
+- Component: [src/components/story-creation-form.tsx](mdc:src/components/story-creation-form.tsx)
+- Service: [src/services/story-service.ts](mdc:src/services/story-service.ts)
+- Actions: [src/app/actions/story-actions.ts](mdc:src/app/actions/story-actions.ts)
+- Validation: [src/lib/story-validation.ts](mdc:src/lib/story-validation.ts)
+
+**Features:**
+- Form validation with real-time error feedback
+- Multi-source URL input support
+- Server Actions integration
+- Story dashboard at [/stories](mdc:src/app/stories/page.tsx)
+
+### ✅ U2: Script Editing (Complete)
+*As a creator, I can review/edit the AI-drafted ≤45-word script in the web UI before rendering.*
+
+**Implementation:**
+- Route: [src/app/stories/[id]/script/page.tsx](mdc:src/app/stories/[id]/script/page.tsx)
+- Service: [src/services/script-service.ts](mdc:src/services/script-service.ts)
+- Actions: [src/app/actions/script-actions.ts](mdc:src/app/actions/script-actions.ts)
+
+**Features:**
+- OpenAI integration with `gpt-4o-mini`
+- RAG-based prompt engineering
+- Real-time word count validation (≤45 words)
+- Save/regenerate functionality
+
+### 🚧 U3: Video Generation (Infrastructure Complete)
+*As a creator, I hit "Generate Video" and, after processing, see the MP4 path plus a Download/Open link.*
+
+**Implementation Status:**
+- ✅ Route: [src/app/stories/[id]/generate/page.tsx](mdc:src/app/stories/[id]/generate/page.tsx)
+- ✅ Services: All video generation services implemented
+  - [src/services/tts-service.ts](mdc:src/services/tts-service.ts) - OpenAI TTS
+  - [src/services/video-generation-service.ts](mdc:src/services/video-generation-service.ts) - Runway ML
+  - [src/services/ffmpeg-service.ts](mdc:src/services/ffmpeg-service.ts) - Video assembly
+  - [src/services/video-orchestration-service.ts](mdc:src/services/video-orchestration-service.ts) - Pipeline
+- ✅ Actions: [src/app/actions/video-actions.ts](mdc:src/app/actions/video-actions.ts)
+- ✅ Test Infrastructure: Comprehensive test coverage for all services
+- 🚧 Final Integration: End-to-end pipeline and file output
+
+## Database Schema
+Core tables defined in [supabase/migrations/](mdc:supabase/migrations):
+- `stories`: Story metadata and status
+- `scripts`: AI-generated and edited scripts
+- `assets`: Generated media files (audio, video, images)
+- `videos`: Final output video files
+
+## Status Flow
+```
+draft → editing → generating → done/failed
+```
+
+Stories progress through these statuses as they move through the pipeline.

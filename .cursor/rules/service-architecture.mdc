@@ -1,0 +1,56 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Service Architecture
+
+## Service Layer Pattern
+All business logic is encapsulated in service classes located in [src/services/](mdc:src/services). Each service handles a specific domain and integrates with external APIs or databases.
+
+## Core Services
+
+### Story Management
+- **[story-service.ts](mdc:src/services/story-service.ts)**: CRUD operations for stories
+- **[script-service.ts](mdc:src/services/script-service.ts)**: OpenAI integration for script generation
+
+### Video Generation Pipeline
+- **[tts-service.ts](mdc:src/services/tts-service.ts)**: OpenAI text-to-speech integration
+- **[video-generation-service.ts](mdc:src/services/video-generation-service.ts)**: Runway ML API integration
+- **[ffmpeg-service.ts](mdc:src/services/ffmpeg-service.ts)**: Video processing and assembly
+- **[video-orchestration-service.ts](mdc:src/services/video-orchestration-service.ts)**: End-to-end pipeline coordination
+
+## Service Patterns
+
+### Error Handling
+Each service has custom error classes:
+```typescript
+export class ServiceNameError extends Error {
+  constructor(message: string, public code?: string) {
+    super(message)
+    this.name = 'ServiceNameError'
+  }
+}
+```
+
+### Singleton Pattern
+Services are exported as singleton instances:
+```typescript
+export const serviceName = new ServiceNameClass()
+```
+
+### Database Integration
+Services use [src/lib/supabase.ts](mdc:src/lib/supabase.ts) for database operations:
+- Use `supabaseAdmin` for server-side operations
+- Proper error handling for database failures
+- Type-safe operations with TypeScript
+
+### External API Integration
+- **OpenAI**: Chat completions and TTS via `@ai-sdk/openai`
+- **Runway ML**: Video generation via `@runwayml/sdk`
+- **Pexels**: Stock footage (planned)
+
+## Service Communication
+- Services are consumed by **Server Actions** in [src/app/actions/](mdc:src/app/actions)
+- Server Actions provide client-safe interfaces to services
+- No direct service calls from client components
