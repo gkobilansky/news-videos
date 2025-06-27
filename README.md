@@ -6,19 +6,28 @@ A self-hosted Next.js application that converts headlines and source links into 
 
 ### ✅ Completed (TDD Foundation)
 - **Environment Setup**: Next.js 15 + TypeScript + Tailwind CSS
-- **Testing Framework**: Jest + React Testing Library with 87 passing tests
+- **Testing Framework**: Jest + React Testing Library with 161 passing tests
 - **Database**: Supabase Postgres with migrations and schema
 - **Story Management**: Complete CRUD operations with validation
-- **User Story U1**: Story creation form with Server Actions
+- **User Story U1**: Story creation form with Server Actions (`/stories/new`)
 - **Story Dashboard**: Complete `/stories` route with filtering and Server Actions
+- **User Story U2**: Complete OpenAI script generation with editing interface (`/stories/[id]/script`)
+  - AI-powered script generation using `gpt-4o-mini` with specialized prompts
+  - Real-time word count validation (≤45 words)
+  - Script editing interface with save/regenerate functionality
+  - Full test coverage for service layer and UI components
 
 ### 🚧 In Progress
-- Script generation with OpenAI integration (User Story U2)
+- **User Story U3**: Video generation pipeline with substantial infrastructure complete
+  - ✅ All core services implemented: TTS, FFmpeg, Video Generation, Orchestration
+  - ✅ Comprehensive test infrastructure for all services
+  - ✅ Video generation route and Server Actions
+  - 🚧 Final end-to-end integration and testing
 
 ### 📋 Roadmap
-- **v0.1**: Next.js UI forms, RAG script, TTS, static placeholder visuals → MP4
-- **v0.2**: Runway Gen-3 integration, stock b-roll pull, Supabase persistence  
-- **v1.0**: Asset caching, batch queue, template theming
+- **v0.1**: Complete video generation pipeline and file output
+- **v0.2**: Asset caching, performance optimization, error recovery
+- **v1.0**: Batch processing, template theming, advanced features
 
 ## 🛠️ Development Setup
 
@@ -103,12 +112,20 @@ This project follows strict TDD principles:
 4. **Validate Phase**: Ensure 100% test suite passes
 
 ### Test Coverage
-- **Story Validation**: 28 tests covering input validation, business rules
-- **Story Service**: 20 tests covering CRUD operations, error handling
-- **Story Creation Form**: 11 tests covering UI validation, form behavior, Server Actions
-- **Story Dashboard**: 12 tests covering list display, filtering, loading/error states
+- **Story Validation**: Comprehensive tests covering input validation, business rules
+- **Story Service**: Complete tests covering CRUD operations, error handling
+- **Story Creation Form**: Full tests covering UI validation, form behavior, Server Actions
+- **Story Dashboard**: Complete tests covering list display, filtering, loading/error states
+- **Script Service**: Full test coverage for OpenAI integration, RAG prompts, validation
+- **Script UI**: Complete tests for editing interface, word count validation, Server Actions
+- **Video Generation Infrastructure**: Comprehensive test suites for all services:
+  - FFmpeg service testing (video processing and assembly)
+  - TTS service testing (OpenAI text-to-speech integration)  
+  - Video generation service testing (Runway ML API integration)
+  - Video orchestration service testing (end-to-end pipeline coordination)
 - **Type Definitions**: Comprehensive type safety validation
 - **Test Utilities**: Mock data factories and database helpers
+- **Total**: 161 passing tests, 2 skipped, 13 test suites
 
 ## 📁 Project Structure
 
@@ -147,22 +164,31 @@ supabase/
 - ✅ Multi-source URL input support
 - ✅ Story dashboard with status filtering (`/stories`)
 
-### 🚧 U2: Script Editing  
+### ✅ U2: Script Editing  
 *As a creator, I can review/edit the AI-drafted ≤45-word script in the web UI before rendering.*
 
-**Status**: Planning
-- 🚧 OpenAI integration for script generation
-- 🚧 Script editing interface
-- 🚧 Word count validation
+**Status**: Complete
+- ✅ OpenAI integration for script generation using `gpt-4o-mini`
+- ✅ RAG-based prompt engineering for optimized script generation
+- ✅ Script editing interface (`/stories/[id]/script`)
+- ✅ Real-time word count validation (≤45 words)
+- ✅ Save/regenerate functionality with Server Actions
+- ✅ Comprehensive error handling and loading states
+- ✅ Full test coverage for service layer and UI components
 
-### 📋 U3: Video Generation
+### 🚧 U3: Video Generation
 *As a creator, I hit "Generate Video" and, after processing, see the MP4 path plus a Download/Open link.*
 
-**Status**: Not started
-- 📋 TTS integration (OpenAI)
-- 📋 Visual asset generation (Runway, Pexels)
-- 📋 Video assembly with ffmpeg
-- 📋 Status tracking and file output
+**Status**: Infrastructure Complete, Final Integration In Progress
+- ✅ TTS service with OpenAI text-to-speech integration
+- ✅ FFmpeg service for video processing and assembly
+- ✅ Video generation service with Runway ML API integration
+- ✅ Video orchestration service for end-to-end pipeline coordination
+- ✅ Video generation route (`/stories/[id]/generate`)
+- ✅ Comprehensive test infrastructure for all services
+- ✅ API test endpoints for validation and debugging
+- 🚧 Final end-to-end integration and file output implementation
+- 🚧 Status tracking and real-time updates
 
 ## 🔑 Environment Variables
 
