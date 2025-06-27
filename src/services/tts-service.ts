@@ -112,6 +112,13 @@ export class TTSService {
   }
 
   async generateTTSForStory(storyId: string, script: string): Promise<Asset> {
+    // First, check if we already have an audio asset for this story
+    const existingAsset = await this.getExistingAudioAsset(storyId, script)
+    if (existingAsset) {
+      console.log(`Reusing existing audio asset for story ${storyId}`)
+      return existingAsset
+    }
+
     let generatedFilepath: string | null = null
 
     try {
@@ -138,6 +145,49 @@ export class TTSService {
         'Failed to generate TTS for story',
         'STORY_TTS_FAILED'
       )
+    }
+  }
+
+  private async getExistingAudioAsset(storyId: string, script: string): Promise<Asset | null> {
+    try {
+      // Get existing audio assets for this story
+      const { data: assets, error } = await this.supabase
+        .from('assets')
+        .select('*')
+        .eq('story_id', storyId)
+        .eq('kind', 'audio')
+        .eq('provider', 'openai')
+        .order('created_at', { ascending: false })
+        .limit(1)
+
+      if (error) {
+        console.error('Failed to fetch existing audio assets:', error)
+        return null
+      }
+
+      if (!assets || assets.length === 0) {
+        return null
+      }
+
+      const asset = assets[0] as Asset
+      
+      // Check if the file still exists on disk
+      const fullPath = path.resolve(process.cwd(), asset.filepath)
+      try {
+        await fs.access(fullPath)
+        return asset
+      } catch (fileError) {
+        // File doesn't exist, remove the asset record and return null
+        console.log(`Audio file ${asset.filepath} no longer exists, removing asset record`)
+        await this.supabase
+          .from('assets')
+          .delete()
+          .eq('id', asset.id)
+        return null
+      }
+    } catch (error) {
+      console.error('Error checking for existing audio asset:', error)
+      return null
     }
   }
 

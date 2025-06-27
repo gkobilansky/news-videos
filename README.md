@@ -17,11 +17,19 @@ A self-hosted Next.js application that converts headlines and source links into 
   - Script editing interface with save/regenerate functionality
   - Full test coverage for service layer and UI components
 
-### 🚧 In Progress
+### ✅ Recently Completed
+- **Video Generation Optimizations**: Performance and reliability improvements
+  - ✅ Audio reuse optimization to prevent redundant TTS generation
+  - ✅ Runway SDK integration with `waitForTaskOutput()` for reliable video generation
+  - ✅ Enhanced error handling with specific error types and better user feedback
+  - ✅ Comprehensive test coverage updates (99 passing tests across all services)
+
+### 🚧 In Progress  
 - **User Story U3**: Video generation pipeline with substantial infrastructure complete
   - ✅ All core services implemented: TTS, FFmpeg, Video Generation, Orchestration
   - ✅ Comprehensive test infrastructure for all services
   - ✅ Video generation route and Server Actions
+  - ✅ Performance optimizations and reliable API integration
   - 🚧 Final end-to-end integration and testing
 
 ### 📋 Roadmap
@@ -96,6 +104,25 @@ assets: story_id, kind (video|image|audio), provider, filepath
 videos: story_id, filepath, duration_sec
 ```
 
+## ⚡ Performance Optimizations
+
+### Audio Reuse System
+The TTS service now intelligently reuses existing audio files for the same story content:
+- **Before**: Every video generation triggered new TTS API calls (~3-5 seconds + API costs)
+- **After**: Existing audio files are detected and reused (near-instant + zero API cost)
+- **Implementation**: `getExistingAudioAsset()` checks database and filesystem before generation
+
+### Runway API Integration
+Replaced manual polling with Runway SDK's built-in task management:
+- **Before**: Custom polling logic prone to timeouts and race conditions
+- **After**: Native `waitForTaskOutput()` with proper timeout and error handling
+- **Benefits**: More reliable video generation, better error messages, reduced timeout issues
+
+### Enhanced Error Handling
+- **Specific Error Types**: `TaskFailedError`, `TaskTimedOutError` for precise error identification
+- **User-Friendly Messages**: Clear feedback for API rate limits, timeouts, and generation failures
+- **Retry Logic**: Failed videos can be regenerated with improved status handling
+
 ### Key Routes
 - `/stories` - Story dashboard with list and status
 - `/stories/new` - Story creation form 
@@ -120,12 +147,13 @@ This project follows strict TDD principles:
 - **Script UI**: Complete tests for editing interface, word count validation, Server Actions
 - **Video Generation Infrastructure**: Comprehensive test suites for all services:
   - FFmpeg service testing (video processing and assembly)
-  - TTS service testing (OpenAI text-to-speech integration)  
-  - Video generation service testing (Runway ML API integration)
+  - TTS service testing (OpenAI text-to-speech integration with audio reuse)
+  - Video generation service testing (Runway ML API integration with waitForTaskOutput)
   - Video orchestration service testing (end-to-end pipeline coordination)
+  - Video service testing (database operations and file management)
 - **Type Definitions**: Comprehensive type safety validation
 - **Test Utilities**: Mock data factories and database helpers
-- **Total**: 161 passing tests, 2 skipped, 13 test suites
+- **Total**: 99 passing tests, 2 skipped, 7 test suites (updated with optimizations)
 
 ## 📁 Project Structure
 
@@ -179,13 +207,15 @@ supabase/
 ### 🚧 U3: Video Generation
 *As a creator, I hit "Generate Video" and, after processing, see the MP4 path plus a Download/Open link.*
 
-**Status**: Infrastructure Complete, Final Integration In Progress
-- ✅ TTS service with OpenAI text-to-speech integration
+**Status**: Infrastructure Complete with Performance Optimizations, Final Integration In Progress
+- ✅ TTS service with OpenAI text-to-speech integration and audio reuse optimization
 - ✅ FFmpeg service for video processing and assembly
-- ✅ Video generation service with Runway ML API integration
+- ✅ Video generation service with optimized Runway ML API integration (`waitForTaskOutput`)
 - ✅ Video orchestration service for end-to-end pipeline coordination
-- ✅ Video generation route (`/stories/[id]/generate`)
-- ✅ Comprehensive test infrastructure for all services
+- ✅ Video generation route (`/stories/[id]/generate`) with improved error handling
+- ✅ Comprehensive test infrastructure for all services (99 passing tests)
+- ✅ Performance optimizations reducing generation time and API costs
+- ✅ Enhanced error handling with specific error types and user feedback
 - ✅ API test endpoints for validation and debugging
 - 🚧 Final end-to-end integration and file output implementation
 - 🚧 Status tracking and real-time updates

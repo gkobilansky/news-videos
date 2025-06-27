@@ -17,6 +17,7 @@ jest.mock('../video-generation-service', () => ({
 
 jest.mock('../ffmpeg-service', () => ({
   ffmpegService: {
+    assembleVideo: jest.fn(),
     assembleVideoForStory: jest.fn()
   }
 }))
@@ -31,6 +32,12 @@ jest.mock('../story-service', () => ({
 jest.mock('../script-service', () => ({
   scriptService: {
     getScript: jest.fn()
+  }
+}))
+
+jest.mock('../video-service', () => ({
+  videoService: {
+    createVideo: jest.fn()
   }
 }))
 
@@ -84,6 +91,11 @@ describe('VideoOrchestrationService', () => {
         filepath: 'assets/video/story-123.mp4'
       })
 
+      const mockAssemblyResult = {
+        filepath: 'output/story-123.mp4',
+        durationSec: 15
+      }
+
       const mockFinalVideo = createMockVideo({
         id: 'final-123',
         story_id: 'story-123',
@@ -104,7 +116,11 @@ describe('VideoOrchestrationService', () => {
       mockTTSService.generateTTSForStory.mockResolvedValue(mockAudioAsset)
       mockVideoGenerationService.generateVideoForStory.mockResolvedValue(mockVideoAsset)
       
-      mockFFmpegService.assembleVideoForStory.mockResolvedValue(mockFinalVideo)
+      mockFFmpegService.assembleVideo.mockResolvedValue(mockAssemblyResult)
+
+      // Mock video service
+      const mockVideoService = require('../video-service').videoService
+      mockVideoService.createVideo = jest.fn().mockResolvedValue(mockFinalVideo)
 
       const result = await orchestrationService.generateVideoForStory('story-123')
 
@@ -124,7 +140,7 @@ describe('VideoOrchestrationService', () => {
         expect.stringContaining('tech breakthrough')
       )
       
-      expect(mockFFmpegService.assembleVideoForStory).toHaveBeenCalledWith(
+      expect(mockFFmpegService.assembleVideo).toHaveBeenCalledWith(
         'story-123',
         {
           audioFilepath: mockAudioAsset.filepath,
@@ -132,6 +148,12 @@ describe('VideoOrchestrationService', () => {
           script: mockScript.text
         }
       )
+      
+      expect(mockVideoService.createVideo).toHaveBeenCalledWith({
+        story_id: 'story-123',
+        filepath: mockAssemblyResult.filepath,
+        duration_sec: mockAssemblyResult.durationSec
+      })
       
       expect(mockStoryService.updateStoryStatus).toHaveBeenCalledWith('story-123', 'done')
 
@@ -269,7 +291,7 @@ describe('VideoOrchestrationService', () => {
       
       mockTTSService.generateTTSForStory.mockResolvedValue(mockAudioAsset)
       mockVideoGenerationService.generateVideoForStory.mockResolvedValue(mockVideoAsset)
-      mockFFmpegService.assembleVideoForStory.mockRejectedValue(new Error('FFmpeg failed'))
+      mockFFmpegService.assembleVideo.mockRejectedValue(new Error('FFmpeg failed'))
 
       await expect(
         orchestrationService.generateVideoForStory('story-123')
@@ -285,6 +307,270 @@ describe('VideoOrchestrationService', () => {
 
       await expect(
         orchestrationService.generateVideoForStory('   ')
+      ).rejects.toThrow(VideoOrchestrationServiceError)
+    })
+  })
+
+  describe('generateAdditionalVideoForStory', () => {
+    it('should generate additional video without changing story status', async () => {
+      const mockStory = createMockStory({
+        id: 'story-123',
+        headline: 'Breaking: Major tech breakthrough announced',
+        status: 'done' // Story already completed
+      })
+
+      const mockScript = createMockScript({
+        story_id: 'story-123',
+        text: 'Major tech breakthrough announced today. This could revolutionize the industry. Scientists are excited about the possibilities.'
+      })
+
+      const mockAudioAsset = createMockAsset({
+        id: 'audio-123',
+        story_id: 'story-123',
+        kind: 'audio',
+        provider: 'openai',
+        filepath: 'assets/audio/story-123.wav'
+      })
+
+      const mockVideoAsset = createMockAsset({
+        id: 'video-124', 
+        story_id: 'story-123',
+        kind: 'video',
+        provider: 'runway',
+        filepath: 'assets/video/story-123-2.mp4'
+      })
+
+      const mockAssemblyResult = {
+        filepath: 'output/story-123-2.mp4',
+        durationSec: 15
+      }
+
+      const mockFinalVideo = createMockVideo({
+        id: 'final-124',
+        story_id: 'story-123',
+        filepath: 'output/story-123-2.mp4',
+        duration_sec: 15
+      })
+
+      // Mock service calls
+      mockStoryService.getStory.mockResolvedValue(mockStory)
+      mockScriptService.getScript.mockResolvedValue(mockScript)
+      
+      mockTTSService.generateTTSForStory.mockResolvedValue(mockAudioAsset)
+      mockVideoGenerationService.generateVideoForStory.mockResolvedValue(mockVideoAsset)
+      
+      mockFFmpegService.assembleVideo.mockResolvedValue(mockAssemblyResult)
+
+      // Mock video service
+      const mockVideoService = require('../video-service').videoService
+      mockVideoService.createVideo.mockResolvedValue(mockFinalVideo)
+
+      const result = await orchestrationService.generateAdditionalVideoForStory('story-123')
+
+      // Verify the pipeline was executed but story status was NOT changed
+      expect(mockStoryService.getStory).toHaveBeenCalledWith('story-123')
+      expect(mockScriptService.getScript).toHaveBeenCalledWith('story-123')
+      
+      // Should NOT call updateStoryStatus for additional videos
+      expect(mockStoryService.updateStoryStatus).not.toHaveBeenCalled()
+      
+      expect(mockTTSService.generateTTSForStory).toHaveBeenCalledWith(
+        'story-123',
+        mockScript.text
+      )
+      
+      expect(mockVideoGenerationService.generateVideoForStory).toHaveBeenCalledWith(
+        'story-123',
+        expect.stringContaining('tech breakthrough')
+      )
+      
+      expect(mockFFmpegService.assembleVideo).toHaveBeenCalledWith(
+        'story-123',
+        {
+          audioFilepath: mockAudioAsset.filepath,
+          videoFilepath: mockVideoAsset.filepath,
+          script: mockScript.text
+        }
+      )
+
+      expect(mockVideoService.createVideo).toHaveBeenCalledWith({
+        story_id: 'story-123',
+        filepath: mockAssemblyResult.filepath,
+        duration_sec: mockAssemblyResult.durationSec
+      })
+
+      expect(result).toEqual(mockFinalVideo)
+    })
+
+    it('should allow generating additional videos for stories with done status', async () => {
+      const mockStory = createMockStory({
+        id: 'story-123',
+        status: 'done'
+      })
+
+      const mockScript = createMockScript({
+        story_id: 'story-123',
+        text: 'Test script'
+      })
+
+      mockStoryService.getStory.mockResolvedValue(mockStory)
+      mockScriptService.getScript.mockResolvedValue(mockScript)
+
+      // Should not throw for done status
+      expect(async () => {
+        await orchestrationService.generateAdditionalVideoForStory('story-123')
+      }).not.toThrow()
+
+      expect(mockStoryService.getStory).toHaveBeenCalledWith('story-123')
+    })
+
+    it('should allow generating additional videos for stories with editing status', async () => {
+      const mockStory = createMockStory({
+        id: 'story-123',
+        status: 'editing'
+      })
+
+      const mockScript = createMockScript({
+        story_id: 'story-123',
+        text: 'Test script'
+      })
+
+      mockStoryService.getStory.mockResolvedValue(mockStory)
+      mockScriptService.getScript.mockResolvedValue(mockScript)
+
+      // Should not throw for editing status
+      expect(async () => {
+        await orchestrationService.generateAdditionalVideoForStory('story-123')
+      }).not.toThrow()
+
+      expect(mockStoryService.getStory).toHaveBeenCalledWith('story-123')
+    })
+
+    it('should allow generating additional videos for stories with failed status', async () => {
+      const mockStory = createMockStory({
+        id: 'story-123',
+        status: 'failed'
+      })
+
+      const mockScript = createMockScript({
+        story_id: 'story-123',
+        text: 'Test script'
+      })
+
+      const mockAudioAsset = createMockAsset({
+        kind: 'audio',
+        filepath: 'assets/audio/story-123.wav'
+      })
+
+      const mockVideoAsset = createMockAsset({
+        kind: 'video',
+        filepath: 'assets/video/story-123.mp4'
+      })
+
+      const mockAssemblyResult = {
+        filepath: 'output/story-123-retry.mp4',
+        durationSec: 15
+      }
+
+      const mockFinalVideo = createMockVideo({
+        id: 'final-retry',
+        story_id: 'story-123',
+        filepath: 'output/story-123-retry.mp4',
+        duration_sec: 15
+      })
+
+      // Mock service calls
+      mockStoryService.getStory.mockResolvedValue(mockStory)
+      mockScriptService.getScript.mockResolvedValue(mockScript)
+      
+      mockTTSService.generateTTSForStory.mockResolvedValue(mockAudioAsset)
+      mockVideoGenerationService.generateVideoForStory.mockResolvedValue(mockVideoAsset)
+      
+      mockFFmpegService.assembleVideo.mockResolvedValue(mockAssemblyResult)
+
+      // Mock video service
+      const mockVideoService = require('../video-service').videoService
+      mockVideoService.createVideo.mockResolvedValue(mockFinalVideo)
+
+      const result = await orchestrationService.generateAdditionalVideoForStory('story-123')
+
+      // Should successfully generate video for failed stories
+      expect(mockStoryService.getStory).toHaveBeenCalledWith('story-123')
+      expect(mockScriptService.getScript).toHaveBeenCalledWith('story-123')
+      expect(result).toEqual(mockFinalVideo)
+    })
+
+    it('should not allow generating additional videos for draft stories', async () => {
+      const mockStory = createMockStory({
+        id: 'story-123',
+        status: 'draft'
+      })
+
+      mockStoryService.getStory.mockResolvedValue(mockStory)
+
+      await expect(
+        orchestrationService.generateAdditionalVideoForStory('story-123')
+      ).rejects.toThrow(VideoOrchestrationServiceError)
+
+      await expect(
+        orchestrationService.generateAdditionalVideoForStory('story-123')
+      ).rejects.toThrow('Cannot generate videos for stories in draft status')
+    })
+
+    it('should not allow generating additional videos for generating stories', async () => {
+      const mockStory = createMockStory({
+        id: 'story-123',
+        status: 'generating'
+      })
+
+      mockStoryService.getStory.mockResolvedValue(mockStory)
+
+      await expect(
+        orchestrationService.generateAdditionalVideoForStory('story-123')
+      ).rejects.toThrow(VideoOrchestrationServiceError)
+
+      await expect(
+        orchestrationService.generateAdditionalVideoForStory('story-123')
+      ).rejects.toThrow('Cannot generate additional videos while another video is generating')
+    })
+
+    it('should handle story not found for additional video generation', async () => {
+      mockStoryService.getStory.mockResolvedValue(null)
+
+      await expect(
+        orchestrationService.generateAdditionalVideoForStory('nonexistent-story')
+      ).rejects.toThrow(VideoOrchestrationServiceError)
+
+      await expect(
+        orchestrationService.generateAdditionalVideoForStory('nonexistent-story')
+      ).rejects.toThrow('Story not found')
+    })
+
+    it('should handle missing script for additional video generation', async () => {
+      const mockStory = createMockStory({
+        id: 'story-123',
+        status: 'done'
+      })
+
+      mockStoryService.getStory.mockResolvedValue(mockStory)
+      mockScriptService.getScript.mockResolvedValue(null)
+
+      await expect(
+        orchestrationService.generateAdditionalVideoForStory('story-123')
+      ).rejects.toThrow(VideoOrchestrationServiceError)
+
+      await expect(
+        orchestrationService.generateAdditionalVideoForStory('story-123')
+      ).rejects.toThrow('Script not found')
+    })
+
+    it('should validate input parameters for additional video generation', async () => {
+      await expect(
+        orchestrationService.generateAdditionalVideoForStory('')
+      ).rejects.toThrow(VideoOrchestrationServiceError)
+
+      await expect(
+        orchestrationService.generateAdditionalVideoForStory('   ')
       ).rejects.toThrow(VideoOrchestrationServiceError)
     })
   })

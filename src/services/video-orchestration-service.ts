@@ -4,6 +4,7 @@ import { scriptService } from './script-service'
 import { ttsService } from './tts-service'
 import { videoGenerationService } from './video-generation-service'
 import { ffmpegService } from './ffmpeg-service'
+import { videoService } from './video-service'
 
 export class VideoOrchestrationServiceError extends Error {
   constructor(message: string, public code?: string) {
@@ -54,13 +55,20 @@ export class VideoOrchestrationService {
 
       // 6. Assemble final video with ffmpeg
       console.log(`${this.getStatusMessage('assembly')} for story ${storyId}`)
-      const finalVideo = await ffmpegService.assembleVideoForStory(storyId, {
+      const assemblyResult = await ffmpegService.assembleVideo(storyId, {
         audioFilepath: audioAsset.filepath,
         videoFilepath: videoAsset.filepath,
         script: script.text
       })
 
-      // 7. Update story status to done
+      // 7. Create video record in database
+      const finalVideo = await videoService.createVideo({
+        story_id: storyId,
+        filepath: assemblyResult.filepath,
+        duration_sec: assemblyResult.durationSec
+      })
+
+      // 8. Update story status to done
       await storyService.updateStoryStatus(storyId, 'done')
 
       console.log(`Video generation completed successfully for story ${storyId}`)
@@ -84,6 +92,82 @@ export class VideoOrchestrationService {
 
       throw new VideoOrchestrationServiceError(
         `Failed to generate video for story: ${error instanceof Error ? error.message : String(error)}`,
+        'GENERATION_FAILED'
+      )
+    }
+  }
+
+  async generateAdditionalVideoForStory(storyId: string): Promise<Video> {
+    if (!storyId || !storyId.trim()) {
+      throw new VideoOrchestrationServiceError('Story ID is required', 'INVALID_STORY_ID')
+    }
+
+    try {
+      // 1. Validate story exists and is ready for additional video generation
+      const story = await storyService.getStory(storyId)
+      if (!story) {
+        throw new VideoOrchestrationServiceError('Story not found', 'STORY_NOT_FOUND')
+      }
+
+      // Additional videos can be generated for stories with editing, done, or failed status
+      // Failed stories should be allowed to retry video generation
+      if (story.status === 'generating') {
+        throw new VideoOrchestrationServiceError(
+          'Cannot generate additional videos while another video is generating',
+          'INVALID_STATUS'
+        )
+      }
+
+      // Draft stories need a script first
+      if (story.status === 'draft') {
+        throw new VideoOrchestrationServiceError(
+          'Cannot generate videos for stories in draft status. Please complete the script first.',
+          'INVALID_STATUS'
+        )
+      }
+
+      // 2. Get the script
+      const script = await scriptService.getScript(storyId)
+      if (!script) {
+        throw new VideoOrchestrationServiceError('Script not found for story', 'SCRIPT_NOT_FOUND')
+      }
+
+      // 3. Generate TTS audio (reuse existing or create new)
+      console.log(`${this.getStatusMessage('tts')} for additional video of story ${storyId}`)
+      const audioAsset = await ttsService.generateTTSForStory(storyId, script.text)
+
+      // 4. Generate video b-roll with variation
+      console.log(`${this.getStatusMessage('video')} for additional video of story ${storyId}`)
+      const videoPrompt = this.generateVideoPrompt(story)
+      const videoAsset = await videoGenerationService.generateVideoForStory(storyId, videoPrompt)
+
+      // 5. Assemble final video with ffmpeg
+      console.log(`${this.getStatusMessage('assembly')} for additional video of story ${storyId}`)
+      const assemblyResult = await ffmpegService.assembleVideo(storyId, {
+        audioFilepath: audioAsset.filepath,
+        videoFilepath: videoAsset.filepath,
+        script: script.text
+      })
+
+      // 6. Create video record in database
+      const finalVideo = await videoService.createVideo({
+        story_id: storyId,
+        filepath: assemblyResult.filepath,
+        duration_sec: assemblyResult.durationSec
+      })
+
+      console.log(`Additional video generation completed successfully for story ${storyId}`)
+      return finalVideo
+
+    } catch (error) {
+      console.error(`Additional video generation failed for story ${storyId}:`, error)
+
+      if (error instanceof VideoOrchestrationServiceError) {
+        throw error
+      }
+
+      throw new VideoOrchestrationServiceError(
+        `Failed to generate additional video for story: ${error instanceof Error ? error.message : String(error)}`,
         'GENERATION_FAILED'
       )
     }

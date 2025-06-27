@@ -9,20 +9,32 @@ global.fetch = jest.fn()
 // Mock fs operations
 jest.mock('fs/promises')
 
-// Mock Runway SDK
+// Mock Runway SDK with waitForTaskOutput support
 jest.mock('@runwayml/sdk', () => {
   return {
     RunwayML: jest.fn().mockImplementation(() => ({
-      imageGeneration: {
+      textToImage: {
         create: jest.fn()
       },
-      videoGeneration: {
+      imageToVideo: {
         create: jest.fn()
       },
       tasks: {
         retrieve: jest.fn()
       }
-    }))
+    })),
+    TaskFailedError: class TaskFailedError extends Error {
+      constructor(message: string) {
+        super(message)
+        this.name = 'TaskFailedError'
+      }
+    },
+    TaskTimedOutError: class TaskTimedOutError extends Error {
+      constructor(message: string) {
+        super(message)
+        this.name = 'TaskTimedOutError'
+      }
+    }
   }
 })
 
@@ -31,8 +43,8 @@ describe('VideoGenerationService', () => {
   let mockFs: jest.Mocked<typeof fs>
   let mockFetch: jest.MockedFunction<typeof fetch>
   let mockRunway: {
-    imageGeneration: { create: jest.MockedFunction<any> }
-    videoGeneration: { create: jest.MockedFunction<any> }
+    textToImage: { create: jest.MockedFunction<any> }
+    imageToVideo: { create: jest.MockedFunction<any> }
     tasks: { retrieve: jest.MockedFunction<any> }
   }
 
@@ -55,47 +67,35 @@ describe('VideoGenerationService', () => {
     await cleanupTestDirectories()
   })
 
-  describe('generateVideo', () => {
+    describe('generateVideo', () => {
     it('should generate video with text prompt using two-step approach', async () => {
-      // Mock Runway SDK responses for image generation task
-      const mockImageTaskResponse = {
-        id: 'image-task-123',
-        status: 'pending',
-        output: null,
-        failure_reason: null
-      }
-      
-      const mockCompletedImageTaskResponse = {
+      // Mock waitForTaskOutput chains
+      const mockImageTaskOutput = {
         id: 'image-task-123',
         status: 'completed',
-        output: ['https://runway.ai/image/output-123.jpg'],
-        failure_reason: null
+        output: ['https://runway.ai/image/output-123.jpg']
       }
       
-      // Mock Runway SDK responses for video generation task
-      const mockVideoTaskResponse = {
-        id: 'video-task-123',
-        status: 'pending',
-        output: null,
-        failure_reason: null
-      }
-      
-      const mockCompletedVideoTaskResponse = {
+      const mockVideoTaskOutput = {
         id: 'video-task-123',
         status: 'completed',
-        output: ['https://runway.ai/video/output-123.mp4'],
-        failure_reason: null
+        output: ['https://runway.ai/video/output-123.mp4']
       }
       
       // Mock video file content
       const mockVideoData = new ArrayBuffer(1024)
       
-      // Mock SDK calls
-      mockRunway.imageGeneration.create.mockResolvedValue(mockImageTaskResponse)
-      mockRunway.videoGeneration.create.mockResolvedValue(mockVideoTaskResponse)
-      mockRunway.tasks.retrieve
-        .mockResolvedValueOnce(mockCompletedImageTaskResponse) // Image task completion
-        .mockResolvedValueOnce(mockCompletedVideoTaskResponse) // Video task completion
+      // Mock SDK calls with waitForTaskOutput chaining
+      const mockWaitForTaskOutputImage = jest.fn().mockResolvedValue(mockImageTaskOutput)
+      const mockWaitForTaskOutputVideo = jest.fn().mockResolvedValue(mockVideoTaskOutput)
+      
+      mockRunway.textToImage.create.mockReturnValue({
+        waitForTaskOutput: mockWaitForTaskOutputImage
+      })
+      
+      mockRunway.imageToVideo.create.mockReturnValue({
+        waitForTaskOutput: mockWaitForTaskOutputVideo
+      })
       
       // Mock video download
       mockFetch.mockResolvedValueOnce({
@@ -112,18 +112,18 @@ describe('VideoGenerationService', () => {
       )
 
       // Verify SDK calls
-      expect(mockRunway.imageGeneration.create).toHaveBeenCalledWith({
-        model: 'runway-ml/runway-stable-diffusion-v1-5',
-        prompt: 'A futuristic cityscape with flying cars and neon lights',
-        width: 768,
-        height: 1344
+      expect(mockRunway.textToImage.create).toHaveBeenCalledWith({
+        model: 'gen4_image',
+        promptText: 'A futuristic cityscape with flying cars and neon lights',
+        ratio: '1080:1920'
       })
 
-      expect(mockRunway.videoGeneration.create).toHaveBeenCalledWith({
+      expect(mockRunway.imageToVideo.create).toHaveBeenCalledWith({
         model: 'gen3a_turbo',
         promptText: 'A futuristic cityscape with flying cars and neon lights',
         promptImage: 'https://runway.ai/image/output-123.jpg',
-        duration: 10
+        duration: 10,
+        ratio: '720:1280'
       })
 
       expect(result).toEqual({
@@ -133,10 +133,14 @@ describe('VideoGenerationService', () => {
     })
 
     it('should handle API errors gracefully', async () => {
-      // Test error at image generation step
-      mockRunway.imageGeneration.create.mockRejectedValue(
+      // Test error at image generation step - make waitForTaskOutput reject
+      const mockWaitForTaskOutput = jest.fn().mockRejectedValue(
         new Error('Rate Limit Exceeded')
       )
+      
+      mockRunway.textToImage.create.mockReturnValue({
+        waitForTaskOutput: mockWaitForTaskOutput
+      })
 
       await expect(
         videoService.generateVideo('story-123', 'Test prompt')
@@ -149,28 +153,25 @@ describe('VideoGenerationService', () => {
 
     it('should handle API errors at video generation step', async () => {
       // Mock successful image generation
-      const mockImageTaskResponse = {
-        id: 'image-task-123',
-        status: 'pending',
-        output: null,
-        failure_reason: null
-      }
-      
-      const mockCompletedImageTaskResponse = {
+      const mockImageTaskOutput = {
         id: 'image-task-123',
         status: 'completed',
-        output: ['https://runway.ai/image/output-123.jpg'],
-        failure_reason: null
+        output: ['https://runway.ai/image/output-123.jpg']
       }
       
-      // Clear any previous mocks
-      jest.clearAllMocks()
-      
-      mockRunway.imageGeneration.create.mockResolvedValue(mockImageTaskResponse)
-      mockRunway.tasks.retrieve.mockResolvedValue(mockCompletedImageTaskResponse)
-      mockRunway.videoGeneration.create.mockRejectedValue(
+      // Mock image generation succeeding but video generation failing
+      const mockWaitForTaskOutputImage = jest.fn().mockResolvedValue(mockImageTaskOutput)
+      const mockWaitForTaskOutputVideo = jest.fn().mockRejectedValue(
         new Error('Bad Request')
       )
+      
+      mockRunway.textToImage.create.mockReturnValue({
+        waitForTaskOutput: mockWaitForTaskOutputImage
+      })
+      
+      mockRunway.imageToVideo.create.mockReturnValue({
+        waitForTaskOutput: mockWaitForTaskOutputVideo
+      })
 
       const promise = videoService.generateVideo('story-123', 'Test prompt')
       
@@ -179,22 +180,17 @@ describe('VideoGenerationService', () => {
     })
 
     it('should handle task polling timeout at image generation step', async () => {
-      const mockImageTaskResponse = {
-        id: 'image-task-123',
-        status: 'pending',
-        output: null,
-        failure_reason: null
-      }
+      // Import the mocked error class
+      const { TaskTimedOutError } = require('@runwayml/sdk')
       
-      mockRunway.imageGeneration.create.mockResolvedValue(mockImageTaskResponse)
-      // Keep returning pending status to trigger timeout
-      mockRunway.tasks.retrieve.mockResolvedValue(mockImageTaskResponse)
-
-      // Mock short timeout for testing
-      const originalTimeout = (videoService as any).POLLING_TIMEOUT_MS
-      const originalInterval = (videoService as any).POLLING_INTERVAL_MS
-      ;(videoService as any).POLLING_TIMEOUT_MS = 200
-      ;(videoService as any).POLLING_INTERVAL_MS = 50
+      // Mock timeout error from waitForTaskOutput
+      const mockWaitForTaskOutput = jest.fn().mockRejectedValue(
+        new TaskTimedOutError('Timeout')
+      )
+      
+      mockRunway.textToImage.create.mockReturnValue({
+        waitForTaskOutput: mockWaitForTaskOutput
+      })
 
       await expect(
         videoService.generateVideo('story-123', 'Test prompt')
@@ -202,11 +198,7 @@ describe('VideoGenerationService', () => {
 
       await expect(
         videoService.generateVideo('story-123', 'Test prompt')
-      ).rejects.toThrow('Video generation timed out')
-
-      // Restore original values
-      ;(videoService as any).POLLING_TIMEOUT_MS = originalTimeout
-      ;(videoService as any).POLLING_INTERVAL_MS = originalInterval
+      ).rejects.toThrow('Image generation timed out')
     }, 15000)
 
     it('should validate input parameters', async () => {
@@ -224,39 +216,30 @@ describe('VideoGenerationService', () => {
     })
 
     it('should handle file download errors', async () => {
-      const mockImageTaskResponse = {
-        id: 'image-task-123',
-        status: 'pending',
-        output: null,
-        failure_reason: null
-      }
-      
-      const mockCompletedImageTaskResponse = {
+      // Mock successful task outputs
+      const mockImageTaskOutput = {
         id: 'image-task-123',
         status: 'completed',
-        output: ['https://runway.ai/image/output-123.jpg'],
-        failure_reason: null
+        output: ['https://runway.ai/image/output-123.jpg']
       }
       
-      const mockVideoTaskResponse = {
-        id: 'video-task-123',
-        status: 'pending',
-        output: null,
-        failure_reason: null
-      }
-      
-      const mockCompletedVideoTaskResponse = {
+      const mockVideoTaskOutput = {
         id: 'video-task-123',
         status: 'completed',
-        output: ['https://runway.ai/video/output-123.mp4'],
-        failure_reason: null
+        output: ['https://runway.ai/video/output-123.mp4']
       }
       
-      mockRunway.imageGeneration.create.mockResolvedValue(mockImageTaskResponse)
-      mockRunway.videoGeneration.create.mockResolvedValue(mockVideoTaskResponse)
-      mockRunway.tasks.retrieve
-        .mockResolvedValueOnce(mockCompletedImageTaskResponse)
-        .mockResolvedValueOnce(mockCompletedVideoTaskResponse)
+      // Mock successful waitForTaskOutput calls
+      const mockWaitForTaskOutputImage = jest.fn().mockResolvedValue(mockImageTaskOutput)
+      const mockWaitForTaskOutputVideo = jest.fn().mockResolvedValue(mockVideoTaskOutput)
+      
+      mockRunway.textToImage.create.mockReturnValue({
+        waitForTaskOutput: mockWaitForTaskOutputImage
+      })
+      
+      mockRunway.imageToVideo.create.mockReturnValue({
+        waitForTaskOutput: mockWaitForTaskOutputVideo
+      })
       
       // Error downloading video file
       mockFetch.mockResolvedValueOnce({
@@ -271,25 +254,18 @@ describe('VideoGenerationService', () => {
     })
 
     it('should handle missing image output', async () => {
-      const mockImageTaskResponse = {
-        id: 'image-task-123',
-        status: 'pending',
-        output: null,
-        failure_reason: null
-      }
-      
-      const mockCompletedImageTaskResponse = {
+      // Mock empty output from waitForTaskOutput
+      const mockImageTaskOutput = {
         id: 'image-task-123',
         status: 'completed',
-        output: [], // No image output
-        failure_reason: null
+        output: [] // No image output
       }
-
-      // Clear any previous mocks
-      jest.clearAllMocks()
-
-      mockRunway.imageGeneration.create.mockResolvedValue(mockImageTaskResponse)
-      mockRunway.tasks.retrieve.mockResolvedValue(mockCompletedImageTaskResponse)
+      
+      const mockWaitForTaskOutput = jest.fn().mockResolvedValue(mockImageTaskOutput)
+      
+      mockRunway.textToImage.create.mockReturnValue({
+        waitForTaskOutput: mockWaitForTaskOutput
+      })
 
       const promise = videoService.generateVideo('story-123', 'Test prompt')
       
@@ -499,63 +475,5 @@ describe('VideoGenerationService', () => {
     })
   })
 
-  describe('pollTaskStatus', () => {
-    it('should poll until task completion', async () => {
-      const taskId = 'task-123'
-      
-      // Reduce polling interval for testing
-      const originalInterval = (videoService as any).POLLING_INTERVAL_MS
-      ;(videoService as any).POLLING_INTERVAL_MS = 10
-      
-      // Mock polling sequence: pending -> pending -> completed
-      mockRunway.tasks.retrieve
-        .mockResolvedValueOnce({ 
-          id: taskId, 
-          status: 'pending',
-          output: null,
-          failure_reason: null
-        })
-        .mockResolvedValueOnce({ 
-          id: taskId, 
-          status: 'pending',
-          output: null,
-          failure_reason: null
-        })
-        .mockResolvedValueOnce({ 
-          id: taskId, 
-          status: 'completed',
-          output: ['https://runway.ai/video/output.mp4'],
-          failure_reason: null
-        })
-
-      const result = await (videoService as any).pollTaskStatus(taskId)
-
-      expect(result).toEqual({
-        id: taskId,
-        status: 'completed',
-        output: ['https://runway.ai/video/output.mp4'],
-        error: null
-      })
-
-      expect(mockRunway.tasks.retrieve).toHaveBeenCalledTimes(3)
-      
-      // Restore original interval
-      ;(videoService as any).POLLING_INTERVAL_MS = originalInterval
-    }, 15000)
-
-    it('should handle failed tasks', async () => {
-      const taskId = 'task-123'
-      
-      mockRunway.tasks.retrieve.mockResolvedValue({ 
-        id: taskId, 
-        status: 'failed',
-        output: null,
-        failure_reason: 'Invalid prompt'
-      })
-
-      await expect(
-        (videoService as any).pollTaskStatus(taskId)
-      ).rejects.toThrow(VideoGenerationServiceError)
-    })
-  })
+  // Note: pollTaskStatus tests removed since we now use waitForTaskOutput() from Runway SDK
 })
