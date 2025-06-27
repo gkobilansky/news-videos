@@ -12,7 +12,11 @@ export async function generateScriptAction(storyId: string): Promise<{ success: 
     }
 
     const script = await scriptService.generateScript(story)
-    await storyService.updateStoryStatus(story.id, 'editing')
+    
+    // Only update status if not already editing
+    if (story.status !== 'editing') {
+      await storyService.updateStoryStatus(story.id, 'editing')
+    }
     
     return { success: true, script }
   } catch (error) {

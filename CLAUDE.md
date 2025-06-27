@@ -20,7 +20,9 @@ This is a **Vertical Newsbite Generator** - a self-hosted Next.js application th
 2. **Script Generation**: OpenAI chat completions generate ≤45 word script with RAG prompt
 3. **Asset Generation**: 
    - TTS via OpenAI (`tts-1` model, `alloy_news` voice) → WAV + timestamps
-   - Video b-roll via Runway Gen-3 REST API
+   - Video b-roll via Runway Gen-3 two-step process:
+     * Text-to-Image: Generate portrait format image (768x1344) from script prompt
+     * Image-to-Video: Convert image to 10-second video with motion
    - Stock footage via Pexels REST API
    - Optional charts via DALL·E or QuickChart
 4. **Video Assembly**: ffmpeg child process concatenates assets, adds captions and watermark
@@ -31,6 +33,7 @@ This is a **Vertical Newsbite Generator** - a self-hosted Next.js application th
 - `/stories` - Story dashboard with list and status
 - `/stories/new` - Story creation form 
 - `/stories/[id]/script` - Script editing interface
+- `/stories/[id]/generate` - Video generation trigger and status page
 - `/api/generate` - Main orchestration endpoint for video generation
 
 ## Database Schema
@@ -185,12 +188,26 @@ A generated video file must:
   - Loading states, error handling with retry functionality
   - Responsive design with proper hover states
 
+- **Video Generation Route**: Complete `/stories/[id]/generate` page with:
+  - Next.js 15 dynamic API compatibility (awaited params)
+  - Script validation before video generation
+  - Status transition logic improvements
+  - Error handling for failed video generation
+  - Navigation between script editing and video generation
+
+- **Video Generation Service**: Updated Runway ML integration with:
+  - Two-step approach: text-to-image → image-to-video
+  - Correct API endpoints (`/text_to_image`, `/image_to_video`, `/tasks`)
+  - Portrait format optimization (768x1344 aspect ratio)
+  - Improved error handling and task polling
+  - Service layer architecture with comprehensive error types
+
 ### 🚧 Active Development Areas
-- **Video Generation Pipeline**: TTS and video assembly for User Story U3
+- **Video Generation Pipeline**: Finalizing Runway ML API integration and video assembly
 
 ### 📋 Next Priority Tasks
-1. Implement TTS service with OpenAI `tts-1` model
-2. Add video generation with Runway Gen-3 integration
+1. Complete Runway ML API implementation and testing
+2. Implement TTS service with OpenAI `tts-1` model
 3. Create video assembly pipeline with ffmpeg
 
 ## Development Workflow
