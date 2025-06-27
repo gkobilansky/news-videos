@@ -2,7 +2,7 @@ import { supabaseAdmin } from '../lib/supabase'
 import { Asset } from '../types'
 import fs from 'fs/promises'
 import path from 'path'
-import { RunwayML, TaskFailedError, TaskTimedOutError } from '@runwayml/sdk'
+import { RunwayML, TaskFailedError } from '@runwayml/sdk'
 
 export class VideoGenerationServiceError extends Error {
   constructor(message: string, public code?: string) {
@@ -230,7 +230,7 @@ export class VideoGenerationService {
         .create({
           model: 'gen4_image',
           promptText: prompt,
-          ratio: '1080:1920' // Portrait format for vertical videos
+          ratio: '720:1280' // Portrait format for vertical videos
         })
         .waitForTaskOutput({
           timeout: this.POLLING_TIMEOUT_MS
@@ -248,7 +248,7 @@ export class VideoGenerationService {
           'TASK_FAILED'
         )
       }
-      if (error instanceof TaskTimedOutError) {
+      if (error.message && error.message.includes('timeout')) {
         throw new VideoGenerationServiceError(
           'Image generation timed out',
           'TIMEOUT'
@@ -269,7 +269,7 @@ export class VideoGenerationService {
           promptText: prompt,
           promptImage: imageUrl,
           duration: 10,
-          ratio: '720:1280' // Portrait format for vertical videos
+          ratio: '768:1280' // Portrait format for vertical videos
         })
         .waitForTaskOutput({
           timeout: this.POLLING_TIMEOUT_MS
@@ -287,7 +287,7 @@ export class VideoGenerationService {
           'TASK_FAILED'
         )
       }
-      if (error instanceof TaskTimedOutError) {
+      if (error.message && error.message.includes('timeout')) {
         throw new VideoGenerationServiceError(
           'Video generation timed out',
           'TIMEOUT'

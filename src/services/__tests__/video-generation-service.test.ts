@@ -29,12 +29,7 @@ jest.mock('@runwayml/sdk', () => {
         this.name = 'TaskFailedError'
       }
     },
-    TaskTimedOutError: class TaskTimedOutError extends Error {
-      constructor(message: string) {
-        super(message)
-        this.name = 'TaskTimedOutError'
-      }
-    }
+
   }
 })
 
@@ -115,7 +110,7 @@ describe('VideoGenerationService', () => {
       expect(mockRunway.textToImage.create).toHaveBeenCalledWith({
         model: 'gen4_image',
         promptText: 'A futuristic cityscape with flying cars and neon lights',
-        ratio: '1080:1920'
+        ratio: '720:1280'
       })
 
       expect(mockRunway.imageToVideo.create).toHaveBeenCalledWith({
@@ -123,7 +118,7 @@ describe('VideoGenerationService', () => {
         promptText: 'A futuristic cityscape with flying cars and neon lights',
         promptImage: 'https://runway.ai/image/output-123.jpg',
         duration: 10,
-        ratio: '720:1280'
+        ratio: '768:1280'
       })
 
       expect(result).toEqual({
@@ -180,13 +175,9 @@ describe('VideoGenerationService', () => {
     })
 
     it('should handle task polling timeout at image generation step', async () => {
-      // Import the mocked error class
-      const { TaskTimedOutError } = require('@runwayml/sdk')
-      
       // Mock timeout error from waitForTaskOutput
-      const mockWaitForTaskOutput = jest.fn().mockRejectedValue(
-        new TaskTimedOutError('Timeout')
-      )
+      const timeoutError = new Error('Request timeout after 300000ms')
+      const mockWaitForTaskOutput = jest.fn().mockRejectedValue(timeoutError)
       
       mockRunway.textToImage.create.mockReturnValue({
         waitForTaskOutput: mockWaitForTaskOutput
