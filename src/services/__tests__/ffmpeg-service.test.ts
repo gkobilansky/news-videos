@@ -378,12 +378,12 @@ describe('FFmpegService', () => {
   })
 
   describe('generateCaptionFile', () => {
-    it('should generate SRT subtitle file from script', async () => {
+    it('should generate synchronized SRT subtitle file with chunked captions', async () => {
       mockFs.writeFile.mockResolvedValue(undefined)
 
       const script = 'This is a test script with multiple words for subtitle generation.'
       const audioFilepath = 'assets/audio/story-123.wav'
-      const audioDurationMs = 6000 // 6 seconds
+      const audioDurationMs = 8000 // 8 seconds
 
       const captionPath = await (ffmpegService as any).generateCaptionFile(
         'story-123',
@@ -393,14 +393,101 @@ describe('FFmpegService', () => {
       )
 
       expect(captionPath).toMatch(/story-123\.srt$/)
-      expect(mockFs.writeFile).toHaveBeenCalledWith(
-        captionPath,
-        expect.stringContaining('00:00:00,000 --> 00:00:06,000')
+
+      // Get the written SRT content
+      const writtenContent = mockFs.writeFile.mock.calls[0][1] as string
+
+      // Should have multiple SRT entries (script is broken into 4-word chunks)
+      // With 3 chunks over 8 seconds: 8000ms / 3 = 2667ms per chunk
+      expect(writtenContent).toMatch(/1\n00:00:00,000 --> 00:00:02,667\nThis is a test\n\n/)
+      expect(writtenContent).toMatch(/2\n00:00:02,667 --> 00:00:05,333\nscript with multiple words\n\n/)
+      expect(writtenContent).toMatch(/3\n00:00:05,333 --> 00:00:08,000\nfor subtitle generation\.\n\n/)
+
+      // Should contain proper timing distribution across 8 seconds
+      expect(writtenContent).toContain('00:00:00,000 --> 00:00:02,667')
+      expect(writtenContent).toContain('00:00:02,667 --> 00:00:05,333')
+      expect(writtenContent).toContain('00:00:05,333 --> 00:00:08,000')
+
+      // Should not contain the entire script as a single caption
+      expect(writtenContent).not.toMatch(/00:00:00,000 --> 00:00:08,000.*This is a test script with multiple words for subtitle generation\./)
+    })
+
+    it('should handle short scripts properly', async () => {
+      mockFs.writeFile.mockResolvedValue(undefined)
+
+      const script = 'Short script here'
+      const audioDurationMs = 3000 // 3 seconds
+
+      const captionPath = await (ffmpegService as any).generateCaptionFile(
+        'story-123',
+        script,
+        'audio.wav',
+        audioDurationMs
       )
-      expect(mockFs.writeFile).toHaveBeenCalledWith(
-        captionPath,
-        expect.stringContaining(script)
+
+      const writtenContent = mockFs.writeFile.mock.calls[0][1] as string
+
+      // Should have single entry for short script (3 words)
+      expect(writtenContent).toMatch(/1\n00:00:00,000 --> 00:00:03,000\nShort script here\n\n/)
+      expect(writtenContent).not.toContain('2\n')
+    })
+  })
+
+  describe('createCaptionChunks', () => {
+    it('should break script into 4-word chunks', () => {
+      const script = 'This is a longer test script with multiple words for testing chunk creation'
+      const chunks = (ffmpegService as any).createCaptionChunks(script)
+
+      expect(chunks).toEqual([
+        'This is a longer',
+        'test script with multiple',
+        'words for testing chunk',
+        'creation'
+      ])
+    })
+
+    it('should handle scripts with exact multiple of 4 words', () => {
+      const script = 'One two three four five six seven eight'
+      const chunks = (ffmpegService as any).createCaptionChunks(script)
+
+      expect(chunks).toEqual([
+        'One two three four',
+        'five six seven eight'
+      ])
+    })
+
+    it('should handle very short scripts', () => {
+      const script = 'One two'
+      const chunks = (ffmpegService as any).createCaptionChunks(script)
+
+      expect(chunks).toEqual(['One two'])
+    })
+  })
+
+  describe('generateSRTContent', () => {
+    it('should create properly timed SRT entries for chunks', () => {
+      const chunks = ['First chunk here', 'Second chunk now', 'Final chunk end']
+      const audioDurationMs = 6000 // 6 seconds (2 seconds per chunk)
+
+      const srtContent = (ffmpegService as any).generateSRTContent(chunks, audioDurationMs)
+
+      expect(srtContent).toBe(
+        '1\n00:00:00,000 --> 00:00:02,000\nFirst chunk here\n\n' +
+        '2\n00:00:02,000 --> 00:00:04,000\nSecond chunk now\n\n' +
+        '3\n00:00:04,000 --> 00:00:06,000\nFinal chunk end\n\n'
       )
+    })
+
+    it('should handle fractional timing correctly', () => {
+      const chunks = ['First', 'Second', 'Third']
+      const audioDurationMs = 5000 // 5 seconds (1666.67ms per chunk)
+
+      const srtContent = (ffmpegService as any).generateSRTContent(chunks, audioDurationMs)
+
+      // 5000ms / 3 chunks = 1666.67ms ≈ 1667ms per chunk
+      expect(srtContent).toContain('00:00:00,000 --> 00:00:01,667')
+      expect(srtContent).toContain('00:00:01,667 --> 00:00:03,333')
+      expect(srtContent).toContain('00:00:03,333 --> 00:00:05,000')
     })
   })
 

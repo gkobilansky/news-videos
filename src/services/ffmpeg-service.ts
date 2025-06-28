@@ -174,25 +174,69 @@ export class FFmpegService {
     
     const captionFile = path.join(captionDir, `${storyId}.srt`)
     
-    // Simple SRT format with single subtitle spanning the entire audio
-    const startTime = '00:00:00,000'
-    const endTime = this.formatSRTTimestamp(audioDurationMs)
-    
-    const srtContent = `1\n${startTime} --> ${endTime}\n${script}\n\n`
+    // Break script into synchronized chunks (3-5 words per caption)
+    const chunks = this.createCaptionChunks(script)
+    const srtContent = this.generateSRTContent(chunks, audioDurationMs)
     
     await fs.writeFile(captionFile, srtContent)
     
     return captionFile
   }
 
+  private createCaptionChunks(script: string): string[] {
+    const words = script.trim().split(/\s+/)
+    const chunks: string[] = []
+    const wordsPerChunk = 4 // Optimal for readability and pacing
+
+    for (let i = 0; i < words.length; i += wordsPerChunk) {
+      const chunk = words.slice(i, i + wordsPerChunk).join(' ')
+      chunks.push(chunk)
+    }
+
+    return chunks
+  }
+
+  private generateSRTContent(chunks: string[], audioDurationMs: number): string {
+    let srtContent = ''
+    const chunkDurationMs = audioDurationMs / chunks.length
+    
+    chunks.forEach((chunk, index) => {
+      const startTimeMs = index * chunkDurationMs
+      const endTimeMs = (index + 1) * chunkDurationMs
+      
+      const startTime = this.formatSRTTimestamp(startTimeMs)
+      const endTime = this.formatSRTTimestamp(endTimeMs)
+      
+      srtContent += `${index + 1}\n${startTime} --> ${endTime}\n${chunk}\n\n`
+    })
+
+    return srtContent
+  }
+
   private buildFFmpegCommand(
     inputs: { audioFile: string; videoFile: string; captionFile: string },
     outputFile: string
   ): string[] {
+    // Optimized subtitle styling for vertical videos (portrait mode)
+    const subtitleStyle = [
+      'Fontsize=18',           // Smaller font for vertical video
+      'PrimaryColour=&Hffffff&', // White text
+      'OutlineColour=&H000000&', // Black outline
+      'Outline=2',             // Outline thickness
+      'Shadow=1',              // Drop shadow for better readability
+      'BackColour=&H80000000&', // Semi-transparent black background
+      'Spacing=0',             // Letter spacing
+      'MarginV=60',            // Bottom margin (positions text higher from bottom)
+      'MarginL=40',            // Left margin
+      'MarginR=40',            // Right margin
+      'Alignment=2',           // Bottom center alignment
+      'WrapStyle=2'            // Smart wrapping
+    ].join(',')
+
     return [
       '-i', inputs.audioFile,
       '-i', inputs.videoFile,
-      '-vf', `subtitles=${inputs.captionFile.replace(/\\/g, '/')}:force_style='Fontsize=24,PrimaryColour=&Hffffff&,OutlineColour=&H000000&,Outline=2'`,
+      '-vf', `subtitles=${inputs.captionFile.replace(/\\/g, '/')}:force_style='${subtitleStyle}'`,
       '-c:v', 'libx264',
       '-c:a', 'aac',
       '-b:v', '2M',
@@ -310,8 +354,10 @@ export class FFmpegService {
   }
 
   private formatSRTTimestamp(milliseconds: number): string {
-    const totalSeconds = Math.floor(milliseconds / 1000)
-    const ms = milliseconds % 1000
+    // Round to ensure clean integer milliseconds
+    const roundedMs = Math.round(milliseconds)
+    const totalSeconds = Math.floor(roundedMs / 1000)
+    const ms = roundedMs % 1000
     const hours = Math.floor(totalSeconds / 3600)
     const minutes = Math.floor((totalSeconds % 3600) / 60)
     const seconds = totalSeconds % 60
