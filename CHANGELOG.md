@@ -7,29 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2024-12-27
+
 ### Added
-- Audio reuse optimization system in TTS service
-- Enhanced error handling with specific error types (`TaskFailedError`, `TaskTimedOutError`)
-- Performance monitoring and optimization documentation
-- Comprehensive test coverage for all video generation services
+- **Complete video generation pipeline** - End-to-end story-to-MP4 generation (User Story U3 COMPLETE)
+- **Pexels stock footage integration** - Alternative video source with intelligent search queries
+- **Dual-provider video generation** - Resilient system with Runway AI + Pexels fallback
+- **Provider-specific asset management** - Automatic filename conflict prevention (`-runway`, `-pexels` suffixes)
+- **Caption overlay system** - Synchronized subtitles with optimized styling for vertical videos
+- **Audio reuse optimization** - Intelligent TTS caching to prevent redundant API calls
+- **Enhanced test coverage** - 221 passing tests across 16 test suites (complete pipeline coverage)
 
 ### Changed
 - **BREAKING**: Upgraded Runway API integration to use `waitForTaskOutput()` instead of manual polling
-- Improved video generation reliability with native SDK timeout handling
-- Enhanced error messages for better user feedback and debugging
-- Updated test infrastructure to support new Runway SDK approach
+- **Improved resilience**: Video generation continues with successful provider when one fails
+- **Enhanced error handling**: Specific error types (`TaskFailedError`, `TaskTimedOutError`) with user-friendly messages
+- **Test infrastructure**: Comprehensive coverage including Pexels service and dual-provider orchestration
 
 ### Optimized
-- **Audio Generation**: TTS service now reuses existing audio files, reducing API calls by ~80% for additional videos
-- **Video Generation**: Replaced custom polling with Runway SDK's built-in task management
-- **Error Handling**: Specific error types provide clearer feedback for timeouts, rate limits, and generation failures
-- **Test Performance**: Streamlined test suite from 161 tests across 13 suites to 99 focused tests across 7 suites
+- **Audio Generation**: TTS service reuses existing audio files, reducing API calls by ~80% for additional videos
+- **Video Generation**: Parallel provider attempts with intelligent fallback logic
+- **Error Recovery**: Failed videos can be retried with improved status handling
+- **File Management**: Automatic cleanup and conflict prevention across multiple providers
 
 ### Fixed
 - Video generation timeout issues due to inefficient polling
 - Redundant TTS API calls for the same story content
-- Unclear error messages during video generation failures
-- Test flakiness in video generation service tests
+- Provider conflicts in asset filename generation
+- Test coverage gaps in video generation pipeline
 
 ## [0.3.0] - 2024-01-27
 

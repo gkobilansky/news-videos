@@ -492,10 +492,10 @@ describe('FFmpegService', () => {
   })
 
   describe('buildFFmpegCommand', () => {
-    it('should build correct ffmpeg command with all options', () => {
+    it('should build correct ffmpeg command with single video file', () => {
       const inputs = {
         audioFile: 'assets/audio/story-123.wav',
-        videoFile: 'assets/video/story-123.mp4',
+        videoFiles: ['assets/video/story-123.mp4'],
         captionFile: 'assets/captions/story-123.srt'
       }
       const outputFile = 'output/story-123.mp4'
@@ -515,6 +515,117 @@ describe('FFmpegService', () => {
         '-y',
         'output/story-123.mp4'
       ])
+      
+      // Single video file should still use simple -vf filtering
+      expect(command).toContain('-vf')
+      expect(command).not.toContain('-filter_complex')
+    })
+
+    it('should build correct ffmpeg command with multiple video files', () => {
+      const inputs = {
+        audioFile: 'assets/audio/story-123.wav',
+        videoFiles: [
+          'assets/video/story-123-runway.mp4',
+          'assets/video/story-123-pexels.mp4'
+        ],
+        captionFile: 'assets/captions/story-123.srt'
+      }
+      const outputFile = 'output/story-123.mp4'
+
+      const command = (ffmpegService as any).buildFFmpegCommand(inputs, outputFile)
+
+      // Should contain inputs for all video files
+      expect(command).toContain('-i')
+      expect(command).toContain('assets/audio/story-123.wav')
+      expect(command).toContain('assets/video/story-123-runway.mp4') 
+      expect(command).toContain('assets/video/story-123-pexels.mp4')
+      
+      // Should use filter_complex for multiple videos
+      expect(command).toContain('-filter_complex')
+      expect(command).toContain('-map')
+      expect(command).toContain('[outv]')
+      
+      // Should still have basic encoding options
+      expect(command).toContain('-c:v')
+      expect(command).toContain('libx264')
+      expect(command).toContain('-c:a')
+      expect(command).toContain('aac')
+      
+      // Should NOT have separate -vf filter when using complex filtergraph
+      expect(command).not.toContain('-vf')
+    })
+
+    it('should build valid filter_complex syntax for multiple video files', () => {
+      const inputs = {
+        audioFile: 'assets/audio/story-123.wav',
+        videoFiles: [
+          'assets/video/story-123-runway.mp4',
+          'assets/video/story-123-pexels.mp4'
+        ],
+        captionFile: 'assets/captions/story-123.srt'
+      }
+      const outputFile = 'output/story-123.mp4'
+
+      const command = (ffmpegService as any).buildFFmpegCommand(inputs, outputFile)
+
+      // Find the filter_complex argument
+      const filterComplexIndex = command.indexOf('-filter_complex')
+      expect(filterComplexIndex).not.toBe(-1)
+      
+      const filterComplex = command[filterComplexIndex + 1]
+      
+      // Should contain valid trim filters with duration
+      expect(filterComplex).toMatch(/\[1:v\]trim=duration=\d+,scale=720:1280,setsar=1\[v0\]/)
+      expect(filterComplex).toMatch(/\[2:v\]trim=duration=\d+,scale=720:1280,setsar=1\[v1\]/)
+      
+      // Should contain concatenation filter
+      expect(filterComplex).toMatch(/\[v0\]\[v1\]concat=n=2:v=1:a=0\[concat\]/)
+      
+      // Should contain subtitles filter integrated into complex filtergraph
+      expect(filterComplex).toMatch(/\[concat\]subtitles=.*story-123\.srt.*\[outv\]/)
+      
+      // Should NOT contain invalid "duration=" filter (without trim=)
+      expect(filterComplex).not.toMatch(/\[1:v\]duration=/)
+      expect(filterComplex).not.toMatch(/\[2:v\]duration=/)
+      
+      // Should calculate proper segment duration (30 seconds / 2 videos = 15 seconds each)
+      expect(filterComplex).toContain('trim=duration=15')
+      
+      // Should NOT have separate -vf filter for multiple video files
+      expect(command).not.toContain('-vf')
+    })
+
+    it('should handle different numbers of video files correctly', () => {
+      const inputs = {
+        audioFile: 'assets/audio/story-123.wav',
+        videoFiles: [
+          'assets/video/story-123-runway.mp4',
+          'assets/video/story-123-pexels.mp4',
+          'assets/video/story-123-extra.mp4'
+        ],
+        captionFile: 'assets/captions/story-123.srt'
+      }
+      const outputFile = 'output/story-123.mp4'
+
+      const command = (ffmpegService as any).buildFFmpegCommand(inputs, outputFile)
+
+      const filterComplexIndex = command.indexOf('-filter_complex')
+      const filterComplex = command[filterComplexIndex + 1]
+      
+      // Should have 3 video inputs with proper duration (30/3 = 10 seconds each)
+      expect(filterComplex).toContain('trim=duration=10')
+      expect(filterComplex).toMatch(/\[v0\]\[v1\]\[v2\]concat=n=3:v=1:a=0\[concat\]/)
+      
+      // Should have all 3 video streams
+      expect(filterComplex).toContain('[v0]')
+      expect(filterComplex).toContain('[v1]')
+      expect(filterComplex).toContain('[v2]')
+      
+      // Should have subtitles integrated into complex filtergraph
+      expect(filterComplex).toMatch(/\[concat\]subtitles=.*\[outv\]/)
+      
+      // Should NOT have separate -vf filter for multiple video files
+      expect(command).not.toContain('-vf')
     })
   })
 

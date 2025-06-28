@@ -300,8 +300,6 @@ export class VideoGenerationService {
     }
   }
 
-
-
   private async downloadVideo(storyId: string, videoUrl: string, takeNumber?: number): Promise<string> {
     const response = await fetch(videoUrl)
 
@@ -316,8 +314,8 @@ export class VideoGenerationService {
     
     const videoDir = path.join(process.cwd(), 'assets', 'video')
     
-    // Include take number in filename if provided
-    const filename = takeNumber ? `${storyId}-take${takeNumber}.mp4` : `${storyId}.mp4`
+    // Include provider name and take number in filename to prevent conflicts
+    const filename = takeNumber ? `${storyId}-runway-take${takeNumber}.mp4` : `${storyId}-runway.mp4`
     const filepath = path.join(videoDir, filename)
 
     await fs.mkdir(videoDir, { recursive: true })

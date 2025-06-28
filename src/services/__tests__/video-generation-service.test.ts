@@ -122,7 +122,7 @@ describe('VideoGenerationService', () => {
       })
 
       expect(result).toEqual({
-        filepath: expect.stringMatching(/assets\/video\/story-123\.mp4$/),
+        filepath: expect.stringMatching(/assets\/video\/story-123-runway\.mp4$/),
         durationSec: 10
       })
     })
@@ -275,7 +275,7 @@ describe('VideoGenerationService', () => {
           story_id: 'story-123',
           kind: 'video',
           provider: 'runway',
-          filepath: 'assets/video/story-123.mp4',
+          filepath: 'assets/video/story-123-runway.mp4',
           metadata: { durationSec: 10 }
         })],
         error: null
@@ -294,7 +294,7 @@ describe('VideoGenerationService', () => {
 
       const asset = await videoService.createVideoAsset(
         'story-123',
-        'assets/video/story-123.mp4',
+        'assets/video/story-123-runway.mp4',
         10
       )
 
@@ -303,7 +303,7 @@ describe('VideoGenerationService', () => {
         story_id: 'story-123',
         kind: 'video',
         provider: 'runway',
-        filepath: 'assets/video/story-123.mp4',
+        filepath: 'assets/video/story-123-runway.mp4',
         metadata: { durationSec: 10 }
       })
 

@@ -15,6 +15,12 @@ jest.mock('../video-generation-service', () => ({
   }
 }))
 
+jest.mock('../pexels-service', () => ({
+  pexelsService: {
+    generateVideoForStory: jest.fn()
+  }
+}))
+
 jest.mock('../ffmpeg-service', () => ({
   ffmpegService: {
     assembleVideo: jest.fn(),
@@ -45,6 +51,7 @@ describe('VideoOrchestrationService', () => {
   let orchestrationService: VideoOrchestrationService
   let mockTTSService: any
   let mockVideoGenerationService: any
+  let mockPexelsService: any
   let mockFFmpegService: any
   let mockStoryService: any
   let mockScriptService: any
@@ -55,6 +62,7 @@ describe('VideoOrchestrationService', () => {
     // Get mocked services
     mockTTSService = require('../tts-service').ttsService
     mockVideoGenerationService = require('../video-generation-service').videoGenerationService
+    mockPexelsService = require('../pexels-service').pexelsService
     mockFFmpegService = require('../ffmpeg-service').ffmpegService
     mockStoryService = require('../story-service').storyService
     mockScriptService = require('../script-service').scriptService
@@ -144,7 +152,7 @@ describe('VideoOrchestrationService', () => {
         'story-123',
         {
           audioFilepath: mockAudioAsset.filepath,
-          videoFilepath: mockVideoAsset.filepath,
+          videoFilepath: [mockVideoAsset.filepath],
           script: mockScript.text
         }
       )
@@ -388,7 +396,7 @@ describe('VideoOrchestrationService', () => {
         'story-123',
         {
           audioFilepath: mockAudioAsset.filepath,
-          videoFilepath: mockVideoAsset.filepath,
+          videoFilepath: [mockVideoAsset.filepath],
           script: mockScript.text
         }
       )

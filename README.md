@@ -18,19 +18,23 @@ A self-hosted Next.js application that converts headlines and source links into 
   - Full test coverage for service layer and UI components
 
 ### ✅ Recently Completed
-- **Video Generation Optimizations**: Performance and reliability improvements
+- **Video Generation Pipeline**: Complete end-to-end implementation with dual-provider resilience
   - ✅ Audio reuse optimization to prevent redundant TTS generation
   - ✅ Runway SDK integration with `waitForTaskOutput()` for reliable video generation
+  - ✅ Pexels stock footage integration as backup/alternative video source
+  - ✅ Resilient dual-provider strategy: continues with successful provider when one fails
   - ✅ Enhanced error handling with specific error types and better user feedback
-  - ✅ Comprehensive test coverage updates (99 passing tests across all services)
+  - ✅ Complete test coverage updates (221 passing tests across all services)
+  - ✅ End-to-end video generation pipeline producing final MP4 outputs
 
-### 🚧 In Progress  
-- **User Story U3**: Video generation pipeline with substantial infrastructure complete
-  - ✅ All core services implemented: TTS, FFmpeg, Video Generation, Orchestration
-  - ✅ Comprehensive test infrastructure for all services
-  - ✅ Video generation route and Server Actions
+### ✅ User Story U3: Video Generation - COMPLETE
+- **Complete Pipeline**: Full video generation from story to final MP4 output
+  - ✅ All core services implemented: TTS, FFmpeg, Video Generation, Orchestration, Pexels
+  - ✅ Dual video provider system (Runway AI + Pexels stock footage)
+  - ✅ Comprehensive test infrastructure for all services  
+  - ✅ Video generation route and Server Actions with complete integration
   - ✅ Performance optimizations and reliable API integration
-  - 🚧 Final end-to-end integration and testing
+  - ✅ Final video output to `/output/<storyId>.mp4` with captions and audio sync
 
 ### 📋 Roadmap
 - **v0.1**: Complete video generation pipeline and file output
@@ -92,7 +96,7 @@ pnpm lint
 - **Styling**: Tailwind CSS
 - **Database**: Supabase Postgres (local via Docker)
 - **Testing**: Jest + React Testing Library
-- **AI Services**: OpenAI (chat + TTS), Runway Gen-3, Pexels
+- **AI Services**: OpenAI (chat + TTS), Runway Gen-3 (video), Pexels (stock footage)
 - **Video Processing**: ffmpeg (local)
 
 ### Database Schema
@@ -117,6 +121,12 @@ Replaced manual polling with Runway SDK's built-in task management:
 - **Before**: Custom polling logic prone to timeouts and race conditions
 - **After**: Native `waitForTaskOutput()` with proper timeout and error handling
 - **Benefits**: More reliable video generation, better error messages, reduced timeout issues
+
+### Dual-Provider Video Generation
+- **Resilient Strategy**: Runway AI + Pexels stock footage attempt video generation in parallel
+- **Fallback Logic**: System continues with successful provider when one fails
+- **Quality Options**: AI-generated custom visuals (Runway) or curated stock footage (Pexels)
+- **Provider-Specific Filenames**: Automatic conflict prevention with `-runway` and `-pexels` suffixes
 
 ### Enhanced Error Handling
 - **Specific Error Types**: `TaskFailedError`, `TaskTimedOutError` for precise error identification
@@ -149,11 +159,12 @@ This project follows strict TDD principles:
   - FFmpeg service testing (video processing and assembly)
   - TTS service testing (OpenAI text-to-speech integration with audio reuse)
   - Video generation service testing (Runway ML API integration with waitForTaskOutput)
-  - Video orchestration service testing (end-to-end pipeline coordination)
+  - Pexels service testing (stock footage search, download, and asset creation)
+  - Video orchestration service testing (end-to-end pipeline coordination with dual providers)
   - Video service testing (database operations and file management)
 - **Type Definitions**: Comprehensive type safety validation
 - **Test Utilities**: Mock data factories and database helpers
-- **Total**: 99 passing tests, 2 skipped, 7 test suites (updated with optimizations)
+- **Total**: 221 passing tests, 2 skipped, 16 test suites (complete pipeline coverage)
 
 ## 📁 Project Structure
 
@@ -204,21 +215,20 @@ supabase/
 - ✅ Comprehensive error handling and loading states
 - ✅ Full test coverage for service layer and UI components
 
-### 🚧 U3: Video Generation
+### ✅ U3: Video Generation
 *As a creator, I hit "Generate Video" and, after processing, see the MP4 path plus a Download/Open link.*
 
-**Status**: Infrastructure Complete with Performance Optimizations, Final Integration In Progress
+**Status**: Complete - End-to-End Pipeline with Dual-Provider Resilience
 - ✅ TTS service with OpenAI text-to-speech integration and audio reuse optimization
-- ✅ FFmpeg service for video processing and assembly
-- ✅ Video generation service with optimized Runway ML API integration (`waitForTaskOutput`)
-- ✅ Video orchestration service for end-to-end pipeline coordination
-- ✅ Video generation route (`/stories/[id]/generate`) with improved error handling
-- ✅ Comprehensive test infrastructure for all services (99 passing tests)
+- ✅ FFmpeg service for video processing and assembly with caption overlay
+- ✅ Dual video generation: Runway ML API integration + Pexels stock footage
+- ✅ Resilient orchestration service with parallel provider attempts and fallback logic
+- ✅ Video generation route (`/stories/[id]/generate`) with complete integration
+- ✅ Comprehensive test infrastructure for all services (221 passing tests)
 - ✅ Performance optimizations reducing generation time and API costs
 - ✅ Enhanced error handling with specific error types and user feedback
-- ✅ API test endpoints for validation and debugging
-- 🚧 Final end-to-end integration and file output implementation
-- 🚧 Status tracking and real-time updates
+- ✅ Final video output to `/output/<storyId>.mp4` with audio sync and captions
+- ✅ Provider-specific asset management with automatic conflict prevention
 
 ## 🔑 Environment Variables
 
