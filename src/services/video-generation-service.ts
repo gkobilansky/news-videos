@@ -36,6 +36,64 @@ export class VideoGenerationService {
     })
   }
 
+  async generateVideoFromStoryboard(storyId: string, storyboard: any, takeNumber?: number): Promise<VideoGenerationResult> {
+    if (!storyId || !storyId.trim()) {
+      throw new VideoGenerationServiceError('Story ID is required', 'INVALID_STORY_ID')
+    }
+
+    if (!storyboard || !storyboard.shots || storyboard.shots.length === 0) {
+      throw new VideoGenerationServiceError('Valid storyboard is required', 'INVALID_STORYBOARD')
+    }
+
+    try {
+      // Create storyboard request for Runway API
+      const storyboardRequest = {
+        model: storyboard.model || 'gen4_turbo',
+        ratio: storyboard.ratio || '720:1280',
+        shots: storyboard.shots.map((shot: any) => ({
+          promptText: shot.promptText,
+          duration: shot.duration,
+          camera: shot.camera || { movement: 'static', angle: 'eye-level' },
+          ...(shot.seed && { seed: shot.seed }),
+          ...(shot.promptImage && { promptImage: shot.promptImage }),
+          ...(shot.referenceImages && { referenceImages: shot.referenceImages })
+        })),
+        fps: storyboard.fps || 24,
+        outputFormat: storyboard.output_format || 'mp4'
+      }
+
+      // Generate video using storyboard
+      const completedTask = await this.createStoryboardVideoTask(storyboardRequest)
+      
+      if (!completedTask.output || completedTask.output.length === 0) {
+        throw new VideoGenerationServiceError('No video generated from storyboard', 'NO_VIDEO_OUTPUT')
+      }
+      
+      // Download the generated video
+      const videoUrl = completedTask.output[0]
+      const filepath = await this.downloadVideo(storyId, videoUrl, takeNumber)
+      
+      // Calculate total duration from shots
+      const totalDuration = storyboard.shots.reduce((total: number, shot: any) => total + shot.duration, 0)
+      
+      return {
+        filepath,
+        durationSec: totalDuration
+      }
+    } catch (error) {
+      if (error instanceof VideoGenerationServiceError) {
+        throw error
+      }
+      
+      console.error('Storyboard video generation failed:', error)
+      throw new VideoGenerationServiceError(
+        'Failed to generate video from storyboard',
+        'STORYBOARD_VIDEO_FAILED'
+      )
+    }
+  }
+
+  // Legacy method for backward compatibility
   async generateVideo(storyId: string, prompt: string, takeNumber?: number): Promise<VideoGenerationResult> {
     if (!storyId || !storyId.trim()) {
       throw new VideoGenerationServiceError('Story ID is required', 'INVALID_STORY_ID')
@@ -295,6 +353,41 @@ export class VideoGenerationService {
       }
       throw new VideoGenerationServiceError(
         `Failed to create video generation task: ${error.message}`,
+        'API_ERROR'
+      )
+    }
+  }
+
+  private async createStoryboardVideoTask(storyboardRequest: any): Promise<RunwayTask> {
+    try {
+      // Use the storyboard creation method from Runway SDK
+      // Based on the documentation: client.video.createStoryboard()
+      const task = await (this.runway as any).video
+        .createStoryboard(storyboardRequest)
+        .waitForTaskOutput({
+          timeout: this.POLLING_TIMEOUT_MS
+        })
+
+      return {
+        id: task.id,
+        status: 'completed' as 'pending' | 'processing' | 'completed' | 'failed',
+        output: task.output || [task.outputUrl] // Handle different response formats
+      }
+    } catch (error: any) {
+      if (error instanceof TaskFailedError) {
+        throw new VideoGenerationServiceError(
+          `Storyboard video generation task failed: ${error.message}`,
+          'TASK_FAILED'
+        )
+      }
+      if (error.message && error.message.includes('timeout')) {
+        throw new VideoGenerationServiceError(
+          'Storyboard video generation timed out',
+          'TIMEOUT'
+        )
+      }
+      throw new VideoGenerationServiceError(
+        `Failed to create storyboard video generation task: ${error.message || String(error)}`,
         'API_ERROR'
       )
     }

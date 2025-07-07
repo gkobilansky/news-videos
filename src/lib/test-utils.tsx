@@ -64,6 +64,35 @@ export const createMockVideo = (overrides = {}) => ({
   ...overrides,
 })
 
+export const createMockStoryboard = (overrides = {}) => ({
+  id: 'test-storyboard-id',
+  story_id: 'test-story-id',
+  model: 'gen4_turbo' as const,
+  ratio: '720:1280' as const,
+  shots: [
+    {
+      promptText: 'Wide establishing shot of news scene, cinematic lighting',
+      duration: 5 as const,
+      camera: { movement: 'static' as const, angle: 'eye-level' as const }
+    },
+    {
+      promptText: 'Close-up handheld shot focusing on key subject, dramatic',
+      duration: 5 as const,
+      camera: { movement: 'handheld' as const, angle: 'low-angle' as const }
+    },
+    {
+      promptText: 'Dolly-in final shot with resolution, warm tones',
+      duration: 5 as const,
+      camera: { movement: 'dolly-in' as const, angle: 'eye-level' as const }
+    }
+  ],
+  fps: 24 as const,
+      output_format: 'mp4' as const,
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+  ...overrides,
+})
+
 // Database test utilities
 export const cleanupTestDb = async (supabase: ReturnType<typeof createTestSupabaseClient>) => {
   // Clean up test data in reverse dependency order
