@@ -3,7 +3,6 @@ import { storyService } from './story-service'
 import { scriptService } from './script-service'
 import { ttsService } from './tts-service'
 import { videoGenerationService } from './video-generation-service'
-import { pexelsService } from './pexels-service'
 import { ffmpegService } from './ffmpeg-service'
 import { videoService } from './video-service'
 
@@ -49,7 +48,7 @@ export class VideoOrchestrationService {
       console.log(`${this.getStatusMessage('tts')} for story ${storyId}`)
       const audioAsset = await ttsService.generateTTSForStory(storyId, script.text)
 
-      // 5. Generate video b-roll (AI + stock footage)
+      // 5. Generate video b-roll with AI
       console.log(`${this.getStatusMessage('video')} for story ${storyId}`)
       const videoFilepaths = await this.generateVideoAssets(storyId, story)
 
@@ -136,7 +135,7 @@ export class VideoOrchestrationService {
       console.log(`${this.getStatusMessage('tts')} for additional video of story ${storyId}`)
       const audioAsset = await ttsService.generateTTSForStory(storyId, script.text)
 
-      // 4. Generate video b-roll with variation (AI + stock footage)
+      // 4. Generate video b-roll with AI variation
       console.log(`${this.getStatusMessage('video')} for additional video of story ${storyId}`)
       const videoFilepaths = await this.generateVideoAssets(storyId, story)
 
@@ -210,76 +209,25 @@ export class VideoOrchestrationService {
 
   private async generateVideoAssets(storyId: string, story: Story): Promise<string[]> {
     const runwayPrompt = this.generateVideoPrompt(story)
-    const pexelsQuery = this.generatePexelsSearchQuery(story)
 
-    const videoAssets: Asset[] = []
-    const videoFilepaths: string[] = []
+    console.log('Attempting video generation with Runway AI...')
+    const videoAsset = await this.generateRunwayVideo(storyId, runwayPrompt)
 
-    // Try to generate both Runway AI video and Pexels stock footage
-    const videoPromises = [
-      this.generateRunwayVideo(storyId, runwayPrompt),
-      this.generatePexelsVideo(storyId, pexelsQuery)
-    ]
-
-    const results = await Promise.allSettled(videoPromises)
-    
-    results.forEach((result, index) => {
-      if (result.status === 'fulfilled' && result.value) {
-        videoAssets.push(result.value)
-        videoFilepaths.push(result.value.filepath)
-        console.log(`${index === 0 ? 'Runway' : 'Pexels'} video generation succeeded`)
-      } else {
-        const reason = result.status === 'fulfilled' ? 'No video asset returned' : result.reason
-        console.warn(`${index === 0 ? 'Runway' : 'Pexels'} video generation failed:`, reason)
-      }
-    })
-
-    if (videoFilepaths.length === 0) {
+    if (!videoAsset) {
       throw new VideoOrchestrationServiceError(
-        'Both Runway and Pexels video generation failed',
-        'ALL_VIDEO_GENERATION_FAILED'
+        'Runway video generation failed',
+        'VIDEO_GENERATION_FAILED'
       )
     }
 
-    console.log(`Successfully generated ${videoFilepaths.length} video asset(s) for story ${storyId}`)
-    return videoFilepaths
+    console.log('Runway video generation succeeded')
+    console.log(`Successfully generated video asset for story ${storyId}`)
+    
+    return [videoAsset.filepath]
   }
 
   private async generateRunwayVideo(storyId: string, prompt: string): Promise<Asset> {
-    console.log('Attempting video generation with Runway AI...')
     return await videoGenerationService.generateVideoForStory(storyId, prompt)
-  }
-
-  private async generatePexelsVideo(storyId: string, query: string): Promise<Asset> {
-    console.log('Attempting video generation with Pexels stock footage...')
-    return await pexelsService.generateVideoForStory(storyId, query)
-  }
-
-  private generatePexelsSearchQuery(story: Story): string {
-    const headline = story.headline.toLowerCase()
-    
-    // Create a search query based on story content
-    let searchTerms: string[] = []
-    
-    if (headline.includes('tech') || headline.includes('ai') || headline.includes('digital')) {
-      searchTerms = ['technology', 'computer', 'digital', 'innovation']
-    } else if (headline.includes('market') || headline.includes('financial') || headline.includes('economic')) {
-      searchTerms = ['business', 'finance', 'office', 'corporate']
-    } else if (headline.includes('science') || headline.includes('research') || headline.includes('discovery')) {
-      searchTerms = ['science', 'laboratory', 'research', 'experiment']
-    } else if (headline.includes('politics') || headline.includes('government') || headline.includes('election')) {
-      searchTerms = ['politics', 'government', 'meeting', 'conference']
-    } else if (headline.includes('climate') || headline.includes('environment') || headline.includes('green')) {
-      searchTerms = ['nature', 'environment', 'green', 'sustainability']
-    } else if (headline.includes('health') || headline.includes('medical')) {
-      searchTerms = ['medical', 'healthcare', 'hospital', 'science']
-    } else {
-      // General news/business fallback
-      searchTerms = ['news', 'business', 'professional', 'office']
-    }
-    
-    // Select first 2-3 terms to avoid too specific searches
-    return searchTerms.slice(0, 2).join(' ')
   }
 
   private getStatusMessage(phase: string): string {

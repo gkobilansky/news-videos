@@ -526,7 +526,7 @@ describe('FFmpegService', () => {
         audioFile: 'assets/audio/story-123.wav',
         videoFiles: [
           'assets/video/story-123-runway.mp4',
-          'assets/video/story-123-pexels.mp4'
+          'assets/video/story-123-additional.mp4'
         ],
         captionFile: 'assets/captions/story-123.srt'
       }
@@ -538,7 +538,7 @@ describe('FFmpegService', () => {
       expect(command).toContain('-i')
       expect(command).toContain('assets/audio/story-123.wav')
       expect(command).toContain('assets/video/story-123-runway.mp4') 
-      expect(command).toContain('assets/video/story-123-pexels.mp4')
+      expect(command).toContain('assets/video/story-123-additional.mp4')
       
       // Should use filter_complex for multiple videos
       expect(command).toContain('-filter_complex')
@@ -560,7 +560,7 @@ describe('FFmpegService', () => {
         audioFile: 'assets/audio/story-123.wav',
         videoFiles: [
           'assets/video/story-123-runway.mp4',
-          'assets/video/story-123-pexels.mp4'
+          'assets/video/story-123-additional.mp4'
         ],
         captionFile: 'assets/captions/story-123.srt'
       }
@@ -600,7 +600,7 @@ describe('FFmpegService', () => {
         audioFile: 'assets/audio/story-123.wav',
         videoFiles: [
           'assets/video/story-123-runway.mp4',
-          'assets/video/story-123-pexels.mp4',
+          'assets/video/story-123-additional.mp4',
           'assets/video/story-123-extra.mp4'
         ],
         captionFile: 'assets/captions/story-123.srt'

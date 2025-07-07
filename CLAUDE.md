@@ -23,7 +23,6 @@ This is a **Vertical Newsbite Generator** - a self-hosted Next.js application th
    - Video b-roll via Runway Gen-3 two-step process:
      * Text-to-Image: Generate portrait format image (768x1344) from script prompt
      * Image-to-Video: Convert image to 10-second video with motion
-   - Stock footage via Pexels REST API
    - Optional charts via DALL·E or QuickChart
 4. **Video Assembly**: ffmpeg child process concatenates assets, adds captions and watermark
 5. **Output**: Final MP4 saved to `/output/<storyId>.mp4`
@@ -80,7 +79,6 @@ open output/<storyId>.mp4  # View generated videos
 ```env
 OPENAI_API_KEY=          # OpenAI API for chat + TTS
 RUNWAY_API_KEY=          # Runway Gen-3 for video generation  
-PEXELS_API_KEY=          # Stock footage access
 DATABASE_URL=            # Postgres connection (if using Supabase)
 ```
 
@@ -95,7 +93,7 @@ This project follows **Test-Driven Development (TDD)**:
 
 Key areas requiring comprehensive testing:
 - Video generation pipeline (ffmpeg orchestration)
-- AI service integrations (OpenAI, Runway, Pexels)
+- AI service integrations (OpenAI, Runway)
 - File system operations and asset management
 - Story state management and transitions
 
@@ -121,7 +119,7 @@ src/
 **Testing Best Practices:**
 - Always write tests before implementation (TDD)
 - Use mock data factories from `test-utils.tsx`
-- Mock external services (OpenAI, Runway, Pexels, ffmpeg)
+- Mock external services (OpenAI, Runway, ffmpeg)
 - Test error handling and edge cases
 - Maintain >80% code coverage
 

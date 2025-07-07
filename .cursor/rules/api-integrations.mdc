@@ -10,7 +10,7 @@ alwaysApply: true
 # AI Services
 OPENAI_API_KEY=          # OpenAI API for chat completions + TTS
 RUNWAY_API_KEY=          # Runway Gen-3 for video generation  
-PEXELS_API_KEY=          # Stock footage access (planned)
+
 
 # Database
 DATABASE_URL=            # Postgres connection

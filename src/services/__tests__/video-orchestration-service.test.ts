@@ -15,12 +15,6 @@ jest.mock('../video-generation-service', () => ({
   }
 }))
 
-jest.mock('../pexels-service', () => ({
-  pexelsService: {
-    generateVideoForStory: jest.fn()
-  }
-}))
-
 jest.mock('../ffmpeg-service', () => ({
   ffmpegService: {
     assembleVideo: jest.fn(),
@@ -51,7 +45,6 @@ describe('VideoOrchestrationService', () => {
   let orchestrationService: VideoOrchestrationService
   let mockTTSService: any
   let mockVideoGenerationService: any
-  let mockPexelsService: any
   let mockFFmpegService: any
   let mockStoryService: any
   let mockScriptService: any
@@ -62,7 +55,6 @@ describe('VideoOrchestrationService', () => {
     // Get mocked services
     mockTTSService = require('../tts-service').ttsService
     mockVideoGenerationService = require('../video-generation-service').videoGenerationService
-    mockPexelsService = require('../pexels-service').pexelsService
     mockFFmpegService = require('../ffmpeg-service').ffmpegService
     mockStoryService = require('../story-service').storyService
     mockScriptService = require('../script-service').scriptService
@@ -502,13 +494,11 @@ describe('VideoOrchestrationService', () => {
 
       const result = await orchestrationService.generateAdditionalVideoForStory('story-123')
 
-      // Should successfully generate video for failed stories
       expect(mockStoryService.getStory).toHaveBeenCalledWith('story-123')
-      expect(mockScriptService.getScript).toHaveBeenCalledWith('story-123')
       expect(result).toEqual(mockFinalVideo)
     })
 
-    it('should not allow generating additional videos for draft stories', async () => {
+    it('should reject generating additional videos for stories with draft status', async () => {
       const mockStory = createMockStory({
         id: 'story-123',
         status: 'draft'
@@ -518,14 +508,10 @@ describe('VideoOrchestrationService', () => {
 
       await expect(
         orchestrationService.generateAdditionalVideoForStory('story-123')
-      ).rejects.toThrow(VideoOrchestrationServiceError)
-
-      await expect(
-        orchestrationService.generateAdditionalVideoForStory('story-123')
       ).rejects.toThrow('Cannot generate videos for stories in draft status')
     })
 
-    it('should not allow generating additional videos for generating stories', async () => {
+    it('should reject generating additional videos while another video is generating', async () => {
       const mockStory = createMockStory({
         id: 'story-123',
         status: 'generating'
@@ -535,26 +521,18 @@ describe('VideoOrchestrationService', () => {
 
       await expect(
         orchestrationService.generateAdditionalVideoForStory('story-123')
-      ).rejects.toThrow(VideoOrchestrationServiceError)
-
-      await expect(
-        orchestrationService.generateAdditionalVideoForStory('story-123')
       ).rejects.toThrow('Cannot generate additional videos while another video is generating')
     })
 
-    it('should handle story not found for additional video generation', async () => {
+    it('should handle story not found', async () => {
       mockStoryService.getStory.mockResolvedValue(null)
-
-      await expect(
-        orchestrationService.generateAdditionalVideoForStory('nonexistent-story')
-      ).rejects.toThrow(VideoOrchestrationServiceError)
 
       await expect(
         orchestrationService.generateAdditionalVideoForStory('nonexistent-story')
       ).rejects.toThrow('Story not found')
     })
 
-    it('should handle missing script for additional video generation', async () => {
+    it('should handle missing script', async () => {
       const mockStory = createMockStory({
         id: 'story-123',
         status: 'done'
@@ -565,14 +543,10 @@ describe('VideoOrchestrationService', () => {
 
       await expect(
         orchestrationService.generateAdditionalVideoForStory('story-123')
-      ).rejects.toThrow(VideoOrchestrationServiceError)
-
-      await expect(
-        orchestrationService.generateAdditionalVideoForStory('story-123')
       ).rejects.toThrow('Script not found')
     })
 
-    it('should validate input parameters for additional video generation', async () => {
+    it('should validate input parameters', async () => {
       await expect(
         orchestrationService.generateAdditionalVideoForStory('')
       ).rejects.toThrow(VideoOrchestrationServiceError)

@@ -45,7 +45,7 @@ process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key'
 process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-role-key'
 process.env.OPENAI_API_KEY = 'test-openai-key'
 process.env.RUNWAY_API_KEY = 'test-runway-key'
-process.env.PEXELS_API_KEY = 'test-pexels-key'
+
 
 // Mock ffmpeg and other system dependencies
 jest.mock('child_process', () => ({

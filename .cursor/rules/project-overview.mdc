@@ -11,7 +11,7 @@ This is a **Vertical Newsbite Generator** - a self-hosted Next.js application th
 ## Tech Stack
 - **Frontend/API**: Next.js 15 with App Router, React Server Components + Server Actions
 - **Database**: Supabase Postgres (Docker) with migrations in [supabase/migrations/](mdc:supabase/migrations)
-- **AI Services**: OpenAI (chat + TTS), Runway Gen-3 (video), Pexels (stock footage)
+- **AI Services**: OpenAI (chat + TTS), Runway Gen-3 (video generation)
 - **Video Processing**: Local ffmpeg for video assembly
 - **Testing**: Jest + React Testing Library (161 tests, 13 test suites)
 - **Storage**: Local filesystem with DB storing relative paths

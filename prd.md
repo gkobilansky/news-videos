@@ -54,7 +54,6 @@ CLI helpers (e.g., `pnpm run generate`) remain optional for power users.
    - `openai.audio.speech.create({ model:"tts-1", voice:"alloy_news" })` → WAV + timestamps.
 4. **Visual Asset Generation**
    - **Runway Gen‑3**: call via REST; prompt template uses headline keywords.
-   - **Stock b‑roll**: fetch from Pexels REST.
    - **Chart still**: optional DALL·E or QuickChart PNG; Ken‑Burns via ffmpeg.
 5. **Captioning** – Transform timestamps → SRT (Node).
 6. **Video Assembly** – Local `ffmpeg` child‑process concatenates, overlays captions, adds watermark.
@@ -70,7 +69,7 @@ Out‑of‑scope: auto‑publish, cloud deploy, analytics.
 | ------------------ | --------------------------------------------------------- | ----------------------------------------------------------------- |
 | **Frontend / API** | **Next.js 14 (App Router)**                               | React server components + server actions                          |
 | **State / DB**     | **Supabase Postgres (Docker)**                            | `supabase start`; or swap to **SQLite** via Prisma if desired     |
-| **AI SDK**         | **@ai‑sdk/openai** (JS)                                   | One client for Chat + TTS; wrap Runway/Pexels calls in same layer |
+| **AI SDK**         | **@ai‑sdk/openai** (JS)                                   | One client for Chat + TTS; wrap Runway calls in same layer |
 | **Orchestration**  | **Node child‑process** inside API route (`/api/generate`) | Spawns ffmpeg, manages temp files                                 |
 | **Video Tooling**  | `ffmpeg` (local install or container)                     | Cross‑platform binary detection                                   |
 | **Storage**        | Local FS: `/assets`, `/output`                            | DB stores relative paths                                          |

@@ -48,7 +48,7 @@ Services use [src/lib/supabase.ts](mdc:src/lib/supabase.ts) for database operati
 ### External API Integration
 - **OpenAI**: Chat completions and TTS via `@ai-sdk/openai`
 - **Runway ML**: Video generation via `@runwayml/sdk`
-- **Pexels**: Stock footage (planned)
+
 
 ## Service Communication
 - Services are consumed by **Server Actions** in [src/app/actions/](mdc:src/app/actions)

@@ -11,29 +11,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Complete video generation pipeline** - End-to-end story-to-MP4 generation (User Story U3 COMPLETE)
-- **Pexels stock footage integration** - Alternative video source with intelligent search queries
-- **Dual-provider video generation** - Resilient system with Runway AI + Pexels fallback
-- **Provider-specific asset management** - Automatic filename conflict prevention (`-runway`, `-pexels` suffixes)
+- **AI video generation system** - High-quality video generation using Runway AI
+- **Advanced prompt engineering** - Context-aware video generation based on story content
 - **Caption overlay system** - Synchronized subtitles with optimized styling for vertical videos
 - **Audio reuse optimization** - Intelligent TTS caching to prevent redundant API calls
 - **Enhanced test coverage** - 221 passing tests across 16 test suites (complete pipeline coverage)
 
 ### Changed
 - **BREAKING**: Upgraded Runway API integration to use `waitForTaskOutput()` instead of manual polling
-- **Improved resilience**: Video generation continues with successful provider when one fails
+- **Improved resilience**: Enhanced error handling and retry logic for video generation
 - **Enhanced error handling**: Specific error types (`TaskFailedError`, `TaskTimedOutError`) with user-friendly messages
-- **Test infrastructure**: Comprehensive coverage including Pexels service and dual-provider orchestration
+- **Test infrastructure**: Comprehensive coverage for complete video generation pipeline
 
 ### Optimized
 - **Audio Generation**: TTS service reuses existing audio files, reducing API calls by ~80% for additional videos
-- **Video Generation**: Parallel provider attempts with intelligent fallback logic
+- **Video Generation**: Reliable Runway AI integration with intelligent error handling
 - **Error Recovery**: Failed videos can be retried with improved status handling
-- **File Management**: Automatic cleanup and conflict prevention across multiple providers
+- **File Management**: Automatic cleanup and proper asset organization
 
 ### Fixed
 - Video generation timeout issues due to inefficient polling
 - Redundant TTS API calls for the same story content
-- Provider conflicts in asset filename generation
+- Asset filename generation and organization
 - Test coverage gaps in video generation pipeline
 
 ## [0.3.0] - 2024-01-27

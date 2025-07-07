@@ -21,7 +21,7 @@ A self-hosted Next.js application that converts headlines and source links into 
 - **Video Generation Pipeline**: Complete end-to-end implementation with dual-provider resilience
   - ✅ Audio reuse optimization to prevent redundant TTS generation
   - ✅ Runway SDK integration with `waitForTaskOutput()` for reliable video generation
-  - ✅ Pexels stock footage integration as backup/alternative video source
+
   - ✅ Resilient dual-provider strategy: continues with successful provider when one fails
   - ✅ Enhanced error handling with specific error types and better user feedback
   - ✅ Complete test coverage updates (221 passing tests across all services)
@@ -29,8 +29,8 @@ A self-hosted Next.js application that converts headlines and source links into 
 
 ### ✅ User Story U3: Video Generation - COMPLETE
 - **Complete Pipeline**: Full video generation from story to final MP4 output
-  - ✅ All core services implemented: TTS, FFmpeg, Video Generation, Orchestration, Pexels
-  - ✅ Dual video provider system (Runway AI + Pexels stock footage)
+  - ✅ All core services implemented: TTS, FFmpeg, Video Generation, Orchestration
+  - ✅ Runway AI video generation system
   - ✅ Comprehensive test infrastructure for all services  
   - ✅ Video generation route and Server Actions with complete integration
   - ✅ Performance optimizations and reliable API integration
@@ -49,7 +49,7 @@ A self-hosted Next.js application that converts headlines and source links into 
 - Docker (for Supabase)
 - OpenAI API key
 - Runway API key
-- Pexels API key
+
 
 ### Installation
 
@@ -96,7 +96,7 @@ pnpm lint
 - **Styling**: Tailwind CSS
 - **Database**: Supabase Postgres (local via Docker)
 - **Testing**: Jest + React Testing Library
-- **AI Services**: OpenAI (chat + TTS), Runway Gen-3 (video), Pexels (stock footage)
+- **AI Services**: OpenAI (chat + TTS), Runway Gen-3 (video generation)
 - **Video Processing**: ffmpeg (local)
 
 ### Database Schema
@@ -122,11 +122,9 @@ Replaced manual polling with Runway SDK's built-in task management:
 - **After**: Native `waitForTaskOutput()` with proper timeout and error handling
 - **Benefits**: More reliable video generation, better error messages, reduced timeout issues
 
-### Dual-Provider Video Generation
-- **Resilient Strategy**: Runway AI + Pexels stock footage attempt video generation in parallel
-- **Fallback Logic**: System continues with successful provider when one fails
-- **Quality Options**: AI-generated custom visuals (Runway) or curated stock footage (Pexels)
-- **Provider-Specific Filenames**: Automatic conflict prevention with `-runway` and `-pexels` suffixes
+### AI Video Generation
+- **Runway Integration**: High-quality AI-generated custom visuals using Runway Gen-3
+- **Intelligent Processing**: Advanced prompt engineering based on story content and themes
 
 ### Enhanced Error Handling
 - **Specific Error Types**: `TaskFailedError`, `TaskTimedOutError` for precise error identification
@@ -159,8 +157,8 @@ This project follows strict TDD principles:
   - FFmpeg service testing (video processing and assembly)
   - TTS service testing (OpenAI text-to-speech integration with audio reuse)
   - Video generation service testing (Runway ML API integration with waitForTaskOutput)
-  - Pexels service testing (stock footage search, download, and asset creation)
-  - Video orchestration service testing (end-to-end pipeline coordination with dual providers)
+
+  - Video orchestration service testing (end-to-end pipeline coordination)
   - Video service testing (database operations and file management)
 - **Type Definitions**: Comprehensive type safety validation
 - **Test Utilities**: Mock data factories and database helpers
@@ -221,14 +219,14 @@ supabase/
 **Status**: Complete - End-to-End Pipeline with Dual-Provider Resilience
 - ✅ TTS service with OpenAI text-to-speech integration and audio reuse optimization
 - ✅ FFmpeg service for video processing and assembly with caption overlay
-- ✅ Dual video generation: Runway ML API integration + Pexels stock footage
-- ✅ Resilient orchestration service with parallel provider attempts and fallback logic
+- ✅ AI video generation: Runway ML API integration with advanced prompting
+- ✅ Orchestration service coordinating the complete video generation pipeline
 - ✅ Video generation route (`/stories/[id]/generate`) with complete integration
 - ✅ Comprehensive test infrastructure for all services (221 passing tests)
 - ✅ Performance optimizations reducing generation time and API costs
 - ✅ Enhanced error handling with specific error types and user feedback
 - ✅ Final video output to `/output/<storyId>.mp4` with audio sync and captions
-- ✅ Provider-specific asset management with automatic conflict prevention
+- ✅ Comprehensive asset management with proper file organization
 
 ## 🔑 Environment Variables
 
@@ -236,7 +234,7 @@ supabase/
 # Required API Keys
 OPENAI_API_KEY=your_openai_api_key_here
 RUNWAY_API_KEY=your_runway_api_key_here  
-PEXELS_API_KEY=your_pexels_api_key_here
+
 
 # Database (Local Development)
 DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54332/postgres
