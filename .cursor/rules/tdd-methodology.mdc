@@ -1,0 +1,45 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Test-Driven Development (TDD) Methodology
+
+## Core TDD Principle
+This project follows **strict TDD principles**. Always write tests BEFORE implementing features.
+
+## TDD Workflow
+1. **Red Phase**: Write failing tests that capture desired functionality
+2. **Green Phase**: Implement minimal code to pass tests
+3. **Refactor Phase**: Improve code structure and readability
+4. **Validate Phase**: Ensure 100% test suite passes
+
+## Test Structure
+- **Test Files**: Located alongside source files in `__tests__/` directories
+- **Test Utilities**: [src/lib/test-utils.tsx](mdc:src/lib/test-utils.tsx) - Mock factories and utilities
+- **Jest Config**: [jest.config.js](mdc:jest.config.js) and [jest.setup.js](mdc:jest.setup.js)
+
+## Testing Patterns
+- **Mock Data Factories**: Use `createMockStory()`, `createMockScript()`, etc. from test-utils
+- **Service Layer**: Test business logic with mocked dependencies
+- **UI Components**: Use React Testing Library for component testing
+- **Server Actions**: Test client-server communication patterns
+- **Error Handling**: Always test both success and error scenarios
+
+## Current Test Coverage
+- **161 passing tests**, 2 skipped, 13 test suites
+- **Service Layer**: Complete coverage for all business logic
+- **UI Components**: Full coverage with user interaction testing
+- **Validation**: Comprehensive input validation testing
+
+## Test Commands
+```bash
+pnpm test              # Run all tests
+pnpm test:watch        # Run tests in watch mode
+pnpm test:coverage     # Run with coverage report
+```
+
+## Key Testing Files
+- [src/services/__tests__/](mdc:src/services/__tests__) - Service layer tests
+- [src/components/__tests__/](mdc:src/components/__tests__) - Component tests
+- [src/lib/__tests__/](mdc:src/lib/__tests__) - Utility function tests

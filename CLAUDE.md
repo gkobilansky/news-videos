@@ -23,7 +23,6 @@ This is a **Vertical Newsbite Generator** - a self-hosted Next.js application th
    - Video b-roll via Runway Gen-3 two-step process:
      * Text-to-Image: Generate portrait format image (768x1344) from script prompt
      * Image-to-Video: Convert image to 10-second video with motion
-   - Stock footage via Pexels REST API
    - Optional charts via DALL·E or QuickChart
 4. **Video Assembly**: ffmpeg child process concatenates assets, adds captions and watermark
 5. **Output**: Final MP4 saved to `/output/<storyId>.mp4`
@@ -80,7 +79,6 @@ open output/<storyId>.mp4  # View generated videos
 ```env
 OPENAI_API_KEY=          # OpenAI API for chat + TTS
 RUNWAY_API_KEY=          # Runway Gen-3 for video generation  
-PEXELS_API_KEY=          # Stock footage access
 DATABASE_URL=            # Postgres connection (if using Supabase)
 ```
 
@@ -95,7 +93,7 @@ This project follows **Test-Driven Development (TDD)**:
 
 Key areas requiring comprehensive testing:
 - Video generation pipeline (ffmpeg orchestration)
-- AI service integrations (OpenAI, Runway, Pexels)
+- AI service integrations (OpenAI, Runway)
 - File system operations and asset management
 - Story state management and transitions
 
@@ -121,7 +119,7 @@ src/
 **Testing Best Practices:**
 - Always write tests before implementation (TDD)
 - Use mock data factories from `test-utils.tsx`
-- Mock external services (OpenAI, Runway, Pexels, ffmpeg)
+- Mock external services (OpenAI, Runway, ffmpeg)
 - Test error handling and edge cases
 - Maintain >80% code coverage
 
@@ -171,6 +169,12 @@ A generated video file must:
   - Multi-source URL input support
   - Server Action integration for database operations
   - Success navigation to script editing
+- **Story Dashboard UI**: Complete `/stories` route with:
+  - Status filtering (All, Draft, Editing, Generating, Done, Failed)
+  - Server Actions integration to avoid client-side Supabase issues
+  - Clean list layout with creation dates and source counts
+  - Loading states, error handling with retry functionality
+  - Responsive design with proper hover states
 
 ### ✅ Recently Completed Features  
 - **User Story U2**: Complete OpenAI script generation with editing interface (`/stories/[id]/script`)
@@ -179,36 +183,32 @@ A generated video file must:
   - Script editing interface with save/regenerate functionality
   - Server Actions integration for client-safe database access
   - Comprehensive error handling and loading states
-  - Full test coverage (27 tests) for both service layer and UI components
+  - Full test coverage for both service layer and UI components
 
-- **Story Dashboard UI**: Complete `/stories` route with:
-  - Status filtering (All, Draft, Editing, Generating, Done, Failed)
-  - Server Actions integration to avoid client-side Supabase issues
-  - Clean list layout with creation dates and source counts
-  - Loading states, error handling with retry functionality
-  - Responsive design with proper hover states
+- **Video Generation Infrastructure**: Comprehensive service layer architecture with:
+  - **Script Service**: OpenAI integration for RAG-based script generation (`src/services/script-service.ts`)
+  - **TTS Service**: OpenAI text-to-speech integration (`src/services/tts-service.ts`)
+  - **FFmpeg Service**: Local video processing and assembly (`src/services/ffmpeg-service.ts`)
+  - **Video Generation Service**: Runway ML API integration with two-step process (`src/services/video-generation-service.ts`)
+  - **Video Orchestration Service**: End-to-end pipeline coordination (`src/services/video-orchestration-service.ts`)
+  - **Complete Test Infrastructure**: 161 passing tests across all service layers and UI components
+  - **API Test Endpoints**: `/api/test-story` and `/api/test-video` for validation and testing
 
 - **Video Generation Route**: Complete `/stories/[id]/generate` page with:
   - Next.js 15 dynamic API compatibility (awaited params)
   - Script validation before video generation
   - Status transition logic improvements
   - Error handling for failed video generation
-  - Navigation between script editing and video generation
-
-- **Video Generation Service**: Updated Runway ML integration with:
-  - Two-step approach: text-to-image → image-to-video
-  - Correct API endpoints (`/text_to_image`, `/image_to_video`, `/tasks`)
-  - Portrait format optimization (768x1344 aspect ratio)
-  - Improved error handling and task polling
-  - Service layer architecture with comprehensive error types
+  - Integration with video orchestration pipeline
 
 ### 🚧 Active Development Areas
-- **Video Generation Pipeline**: Finalizing Runway ML API integration and video assembly
+- **User Story U3**: Final video generation pipeline integration and testing
+- **Video Pipeline Optimization**: Performance tuning and error recovery
 
 ### 📋 Next Priority Tasks
-1. Complete Runway ML API implementation and testing
-2. Implement TTS service with OpenAI `tts-1` model
-3. Create video assembly pipeline with ffmpeg
+1. Complete end-to-end video generation pipeline testing
+2. Implement video file output and download functionality
+3. Add video generation status tracking and real-time updates
 
 ## Development Workflow
 
@@ -220,11 +220,16 @@ A generated video file must:
 4. **Validate**: Ensure all tests pass
 
 ### Current Test Status
-- **116 total tests** (114 passing, 2 skipped) across validation, service, and UI layers
+- **161 total tests** (159 passing, 2 skipped) across validation, service, and UI layers
 - **Story creation (U1)**: ✅ Complete with full-stack testing (backend + UI)
-- **Story dashboard**: ✅ Complete with 12 comprehensive tests covering all states
-- **Script generation (U2)**: ✅ Complete with 27 tests covering service logic and UI interactions
-- **Video generation (U3)**: 📋 Not started
+- **Story dashboard**: ✅ Complete with comprehensive tests covering all states
+- **Script generation (U2)**: ✅ Complete with full test coverage for service logic and UI interactions
+- **Video generation infrastructure**: ✅ Complete with comprehensive test suites for all services:
+  - FFmpeg service testing (video processing and assembly)
+  - TTS service testing (OpenAI text-to-speech integration)
+  - Video generation service testing (Runway ML API integration)
+  - Video orchestration service testing (end-to-end pipeline coordination)
+- **Video generation (U3)**: 🚧 Infrastructure complete, final integration testing in progress
 
 ## Project Guidance
 

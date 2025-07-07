@@ -2,6 +2,7 @@ import { supabaseAdmin } from '../lib/supabase'
 import { Asset } from '../types'
 import fs from 'fs/promises'
 import path from 'path'
+import { RunwayML, TaskFailedError } from '@runwayml/sdk'
 
 export class VideoGenerationServiceError extends Error {
   constructor(message: string, public code?: string) {
@@ -19,22 +20,23 @@ interface RunwayTask {
   id: string
   status: 'pending' | 'processing' | 'completed' | 'failed'
   output?: string[]
-  error?: string
 }
 
 export class VideoGenerationService {
   private supabase = supabaseAdmin
-  private readonly RUNWAY_API_URL = 'https://api.runwayml.com/v1'
-  private readonly POLLING_INTERVAL_MS = 5000
+  private runway: RunwayML
   private readonly POLLING_TIMEOUT_MS = 300000 // 5 minutes
 
   constructor() {
     if (!process.env.RUNWAY_API_KEY) {
       throw new VideoGenerationServiceError('Runway API key is required', 'MISSING_API_KEY')
     }
+    this.runway = new RunwayML({
+      apiKey: process.env.RUNWAY_API_KEY
+    })
   }
 
-  async generateVideo(storyId: string, prompt: string): Promise<VideoGenerationResult> {
+  async generateVideo(storyId: string, prompt: string, takeNumber?: number): Promise<VideoGenerationResult> {
     if (!storyId || !storyId.trim()) {
       throw new VideoGenerationServiceError('Story ID is required', 'INVALID_STORY_ID')
     }
@@ -44,23 +46,23 @@ export class VideoGenerationService {
     }
 
     try {
-      // Step 1: Generate image from text
-      const imageTask = await this.createImageGenerationTask(prompt.trim())
-      const completedImageTask = await this.pollTaskStatus(imageTask.id)
+      // Step 1: Generate image from text (using waitForTaskOutput)
+      const completedImageTask = await this.createImageGenerationTask(prompt.trim())
       
       if (!completedImageTask.output || completedImageTask.output.length === 0) {
         throw new VideoGenerationServiceError('No image generated from text prompt', 'NO_IMAGE_OUTPUT')
       }
 
-      // Step 2: Generate video from image
-      const videoTask = await this.createVideoFromImageTask(completedImageTask.output[0], prompt.trim())
+      // Step 2: Generate video from image (using waitForTaskOutput)
+      const completedVideoTask = await this.createVideoFromImageTask(completedImageTask.output[0], prompt.trim())
       
-      // Poll for task completion
-      const completedVideoTask = await this.pollTaskStatus(videoTask.id)
+      if (!completedVideoTask.output || completedVideoTask.output.length === 0) {
+        throw new VideoGenerationServiceError('No video generated from image', 'NO_VIDEO_OUTPUT')
+      }
       
       // Download the generated video
-      const videoUrl = completedVideoTask.output![0]
-      const filepath = await this.downloadVideo(storyId, videoUrl)
+      const videoUrl = completedVideoTask.output[0]
+      const filepath = await this.downloadVideo(storyId, videoUrl, takeNumber)
       
       return {
         filepath,
@@ -142,97 +144,163 @@ export class VideoGenerationService {
     }
   }
 
-  private async createImageGenerationTask(prompt: string): Promise<RunwayTask> {
-    const response = await fetch(`${this.RUNWAY_API_URL}/text_to_image`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.RUNWAY_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'runway-ml/runway-stable-diffusion-v1-5',
-        prompt: prompt,
-        width: 768,
-        height: 1344 // Portrait format for vertical videos
-      }),
-    })
+  async regenerateVideoForStory(storyId: string, prompt: string, takeNumber?: number): Promise<Asset> {
+    let generatedFilepath: string | null = null
 
-    if (!response.ok) {
+    try {
+      // Clean up any existing video assets for this story before regenerating
+      await this.cleanupExistingVideoAssets(storyId)
+
+      // Generate with take number suffix for multiple versions
+      const { filepath, durationSec } = await this.generateVideo(storyId, prompt, takeNumber)
+      generatedFilepath = filepath
+
+      const asset = await this.createVideoAsset(storyId, filepath, durationSec)
+      
+      return asset
+    } catch (error) {
+      if (generatedFilepath) {
+        try {
+          await fs.unlink(generatedFilepath)
+        } catch (cleanupError) {
+          console.error('Failed to cleanup video file:', cleanupError)
+        }
+      }
+
+      if (error instanceof VideoGenerationServiceError) {
+        throw error
+      }
+
       throw new VideoGenerationServiceError(
-        `Failed to create image generation task: ${response.status} ${response.statusText}`,
+        'Failed to regenerate video for story',
+        'STORY_VIDEO_REGENERATION_FAILED'
+      )
+    }
+  }
+
+  private async cleanupExistingVideoAssets(storyId: string): Promise<void> {
+    try {
+      // Get existing video assets for this story
+      const { data: existingAssets, error } = await this.supabase
+        .from('assets')
+        .select('*')
+        .eq('story_id', storyId)
+        .eq('kind', 'video')
+        .eq('provider', 'runway')
+
+      if (error) {
+        console.error('Failed to fetch existing video assets:', error)
+        return // Don't fail regeneration if cleanup fails
+      }
+
+      if (existingAssets && existingAssets.length > 0) {
+        // Delete files from filesystem
+        for (const asset of existingAssets) {
+          try {
+            const fullPath = path.resolve(process.cwd(), asset.filepath)
+            await fs.unlink(fullPath)
+          } catch (fileError) {
+            console.error(`Failed to delete video file ${asset.filepath}:`, fileError)
+            // Continue with other files
+          }
+        }
+
+        // Delete database records
+        const { error: deleteError } = await this.supabase
+          .from('assets')
+          .delete()
+          .eq('story_id', storyId)
+          .eq('kind', 'video')
+          .eq('provider', 'runway')
+
+        if (deleteError) {
+          console.error('Failed to delete existing video asset records:', deleteError)
+          // Don't fail regeneration if cleanup fails
+        }
+      }
+    } catch (error) {
+      console.error('Failed to cleanup existing video assets:', error)
+      // Don't fail regeneration if cleanup fails
+    }
+  }
+
+  private async createImageGenerationTask(prompt: string): Promise<RunwayTask> {
+    try {
+      const task = await this.runway.textToImage
+        .create({
+          model: 'gen4_image',
+          promptText: prompt,
+          ratio: '720:1280' // Portrait format for vertical videos
+        })
+        .waitForTaskOutput({
+          timeout: this.POLLING_TIMEOUT_MS
+        })
+
+      return {
+        id: task.id,
+        status: 'completed' as 'pending' | 'processing' | 'completed' | 'failed',
+        output: task.output
+      }
+    } catch (error: any) {
+      if (error instanceof TaskFailedError) {
+        throw new VideoGenerationServiceError(
+          `Image generation task failed: ${error.message}`,
+          'TASK_FAILED'
+        )
+      }
+      if (error.message && error.message.includes('timeout')) {
+        throw new VideoGenerationServiceError(
+          'Image generation timed out',
+          'TIMEOUT'
+        )
+      }
+      throw new VideoGenerationServiceError(
+        `Failed to create image generation task: ${error.message}`,
         'API_ERROR'
       )
     }
-
-    return response.json()
   }
 
   private async createVideoFromImageTask(imageUrl: string, prompt: string): Promise<RunwayTask> {
-    const response = await fetch(`${this.RUNWAY_API_URL}/image_to_video`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.RUNWAY_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gen3a_turbo',
-        prompt_text: prompt,
-        image: imageUrl,
-        duration: 10
-      }),
-    })
+    try {
+      const task = await this.runway.imageToVideo
+        .create({
+          model: 'gen3a_turbo',
+          promptText: prompt,
+          promptImage: imageUrl,
+          duration: 10,
+          ratio: '768:1280' // Portrait format for vertical videos
+        })
+        .waitForTaskOutput({
+          timeout: this.POLLING_TIMEOUT_MS
+        })
 
-    if (!response.ok) {
+      return {
+        id: task.id,
+        status: 'completed' as 'pending' | 'processing' | 'completed' | 'failed',
+        output: task.output
+      }
+    } catch (error: any) {
+      if (error instanceof TaskFailedError) {
+        throw new VideoGenerationServiceError(
+          `Video generation task failed: ${error.message}`,
+          'TASK_FAILED'
+        )
+      }
+      if (error.message && error.message.includes('timeout')) {
+        throw new VideoGenerationServiceError(
+          'Video generation timed out',
+          'TIMEOUT'
+        )
+      }
       throw new VideoGenerationServiceError(
-        `Failed to create video generation task: ${response.status} ${response.statusText}`,
+        `Failed to create video generation task: ${error.message}`,
         'API_ERROR'
       )
     }
-
-    return response.json()
   }
 
-  private async pollTaskStatus(taskId: string): Promise<RunwayTask> {
-    const startTime = Date.now()
-
-    while (Date.now() - startTime < this.POLLING_TIMEOUT_MS) {
-      const response = await fetch(`${this.RUNWAY_API_URL}/tasks/${taskId}`, {
-        headers: {
-          'Authorization': `Bearer ${process.env.RUNWAY_API_KEY}`,
-        },
-      })
-
-      if (!response.ok) {
-        throw new VideoGenerationServiceError(
-          `Failed to check task status: ${response.status} ${response.statusText}`,
-          'API_ERROR'
-        )
-      }
-
-      const task: RunwayTask = await response.json()
-
-      if (task.status === 'completed' && task.output && task.output.length > 0) {
-        return task
-      }
-
-      if (task.status === 'failed') {
-        throw new VideoGenerationServiceError(
-          `Video generation failed: ${task.error || 'Unknown error'}`,
-          'GENERATION_FAILED'
-        )
-      }
-
-      // Wait before next poll
-      await new Promise(resolve => setTimeout(resolve, this.POLLING_INTERVAL_MS))
-    }
-
-    throw new VideoGenerationServiceError(
-      'Video generation timed out',
-      'TIMEOUT'
-    )
-  }
-
-  private async downloadVideo(storyId: string, videoUrl: string): Promise<string> {
+  private async downloadVideo(storyId: string, videoUrl: string, takeNumber?: number): Promise<string> {
     const response = await fetch(videoUrl)
 
     if (!response.ok) {
@@ -245,7 +313,10 @@ export class VideoGenerationService {
     const videoBuffer = Buffer.from(await response.arrayBuffer())
     
     const videoDir = path.join(process.cwd(), 'assets', 'video')
-    const filepath = path.join(videoDir, `${storyId}.mp4`)
+    
+    // Include provider name and take number in filename to prevent conflicts
+    const filename = takeNumber ? `${storyId}-runway-take${takeNumber}.mp4` : `${storyId}-runway.mp4`
+    const filepath = path.join(videoDir, filename)
 
     await fs.mkdir(videoDir, { recursive: true })
     await fs.writeFile(filepath, videoBuffer)

@@ -1,0 +1,64 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Development Workflow
+
+## Setup Commands
+```bash
+pnpm i                    # Install dependencies
+supabase start           # Start Postgres (if using Supabase)
+pnpm dev                 # Start development server (localhost:3000)
+```
+
+## Database Management (Supabase CLI)
+```bash
+supabase db reset        # Reset database to clean state
+supabase db push         # Push schema changes to database
+supabase db pull         # Pull schema changes from remote
+supabase migration new <name>  # Create new migration
+supabase migration up    # Run pending migrations
+supabase status          # Check Supabase services status
+```
+
+## Testing & Quality
+```bash
+pnpm test                # Run test suite
+pnpm test:watch          # Run tests in watch mode
+pnpm test:coverage       # Run tests with coverage report
+pnpm test:ci             # Run tests for CI/CD
+pnpm lint                # Lint code
+pnpm type-check          # TypeScript checks
+```
+
+## Development Best Practices
+
+### TDD First
+1. Always write failing tests before implementing features
+2. Use mock factories from [src/lib/test-utils.tsx](mdc:src/lib/test-utils.tsx)
+3. Test both success and error scenarios
+4. Maintain >80% code coverage
+
+### Server Actions Pattern
+- Use Server Actions for client-server communication to avoid Supabase client issues
+- Server Actions in [src/app/actions/](mdc:src/app/actions) consume services
+- Never call Supabase directly from client components
+
+### Error Handling
+- Implement robust error boundaries for AI service failures
+- Use custom error classes with specific error codes
+- Provide meaningful error messages to users
+
+### File Management
+- Assets stored in `/assets` directory
+- Output videos in `/output` directory
+- Database stores relative file paths, not absolute paths
+
+## Current Branch: video-generation
+Working on User Story U3 (video generation pipeline) with infrastructure complete and final integration in progress.
+
+## Key Files for Development
+- [src/types/index.ts](mdc:src/types/index.ts) - Type definitions
+- [src/lib/story-validation.ts](mdc:src/lib/story-validation.ts) - Input validation
+- [supabase/migrations/](mdc:supabase/migrations) - Database schema

@@ -76,11 +76,11 @@ describe('StoryDashboard', () => {
 
     it('shows story status badges', async () => {
       const mockStories: Story[] = [
-        createMockStory({ status: 'draft' }),
-        createMockStory({ status: 'editing' }),
-        createMockStory({ status: 'generating' }),
-        createMockStory({ status: 'done' }),
-        createMockStory({ status: 'failed' })
+        createMockStory({ id: 'story-1', status: 'draft' }),
+        createMockStory({ id: 'story-2', status: 'editing' }),
+        createMockStory({ id: 'story-3', status: 'generating' }),
+        createMockStory({ id: 'story-4', status: 'done' }),
+        createMockStory({ id: 'story-5', status: 'failed' })
       ]
       
       mockGetAllStoriesAction.mockResolvedValue({ success: true, stories: mockStories })

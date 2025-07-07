@@ -99,7 +99,7 @@ describe('Type Definitions', () => {
         id: 'asset-id',
         story_id: 'story-id',
         kind: 'image',
-        provider: 'pexels',
+        provider: 'runway',
         filepath: '/path/to/image.jpg',
         created_at: '2024-01-01T00:00:00Z',
       }
