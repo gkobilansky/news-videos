@@ -177,11 +177,10 @@ export function StoryboardEditor({ story, storyboard, onSave, onGenerate, onGene
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Storyboard Editor</h1>
-        <p className="text-gray-600">Edit your 3-shot storyboard for "{story.headline}"</p>
-        <div className="mt-4 flex items-center gap-4 text-sm text-gray-500">
+    <div>
+      <div className="mb-6">
+        <p className="text-gray-600 mb-2">Edit your storyboard for "{story.headline}"</p>
+        <div className="flex items-center gap-4 text-sm text-gray-500">
           <span>Total Duration: <strong>{getTotalDuration()}s</strong></span>
           <span>Format: <strong>Portrait (768:1280)</strong></span>
           <span>Model: <strong>Runway Gen-4 Turbo</strong></span>
@@ -192,7 +191,7 @@ export function StoryboardEditor({ story, storyboard, onSave, onGenerate, onGene
         <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
           <h3 className="font-medium text-blue-900 mb-2">No Storyboard Generated Yet</h3>
           <p className="text-blue-700 text-sm mb-3">
-            Generate a 3-shot storyboard using AI, then customize each shot to your preferences.
+            Generate a storyboard using AI, then customize each shot to your preferences and create reference images.
           </p>
           <button
             onClick={onGenerate}
@@ -518,9 +517,8 @@ export function StoryboardEditor({ story, storyboard, onSave, onGenerate, onGene
       <div className="mt-8 bg-gray-50 rounded-lg p-6">
         <h4 className="font-medium text-gray-900 mb-3">Storyboard Tips</h4>
         <ul className="text-sm text-gray-600 space-y-2">
-          <li>• <strong>Shot 1:</strong> Establish the scene with a wide or medium shot</li>
-          <li>• <strong>Shot 2:</strong> Focus on key details or subjects with close-ups</li>
-          <li>• <strong>Shot 3:</strong> Conclude with resolution or wider context</li>
+          <li>• <strong>Start with 2-3 shots:</strong> Establish scene, focus on key details, conclude with resolution</li>
+          <li>• <strong>Generate reference images:</strong> Visualize shots before video creation</li>
           <li>• Use specific visual language: "cinematic lighting", "handheld camera", "shallow depth of field"</li>
           <li>• Camera movements add dynamism but use sparingly for news content</li>
           <li>• Total duration should be 15-20 seconds for optimal social media engagement</li>

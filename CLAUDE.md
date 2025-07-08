@@ -218,6 +218,33 @@ A generated video file must:
   - **TDD Implementation**: Tests written first, then implementation
   - **Error Handling**: Robust validation and user feedback
 
+- **Reference Image Generation**: Separated image and video generation workflow (`/stories/[id]/storyboard`)
+  - **Image Generation Service**: Dedicated service for creating reference images (`src/services/image-generation-service.ts`)
+    - `generateStoryboardImages()` - Generate images for all shots in storyboard
+    - `generateImageForShot()` - Generate single image for specific shot
+    - `regenerateStoryboardImages()` - Regenerate all images with cleanup
+    - `getStoryImageAssets()` - Retrieve existing image assets
+  - **Server Actions**: Complete image generation workflow (`src/app/actions/image-generation-actions.ts`)
+    - `generateStoryboardImagesAction()`, `regenerateStoryboardImagesAction()`
+    - `generateImageForShotAction()`, `getStoryImageAssetsAction()`
+  - **UI Components**: Reference image display alongside storyboard (`src/components/storyboard-images.tsx`)
+    - Side-by-side layout with storyboard editor and image gallery
+    - Image generation controls (generate, regenerate, per-shot regeneration)
+    - Modal image preview with metadata overlay
+    - Grouped images by shot with proper organization
+  - **Database Integration**: Uses existing assets table for image storage
+  - **Test Coverage**: 13 comprehensive tests covering all image generation functionality
+  - **TDD Implementation**: Service and UI components built test-first
+  - **Error Handling**: Robust API error handling and user feedback
+
+- **Storyboard Layout Improvements**: Enhanced visual design and responsive layout (`/stories/[id]/storyboard`)
+  - **Proper Containers**: Added max-width container with responsive padding for better page structure
+  - **Side-by-Side Layout**: Fixed grid system to display storyboard editor and reference images side by side
+  - **Visual Separation**: Added card-style containers with borders and background colors for clear section separation
+  - **Image Sizing**: Optimized reference image grid from 3-column to 2-column layout for better visibility
+  - **Responsive Design**: Improved breakpoints and mobile/tablet experience with proper spacing
+  - **Section Headers**: Added clear section titles with consistent styling throughout the interface
+
 ### 🚧 Active Development Areas
 - **User Story U3**: Final video generation pipeline integration and testing
 - **Video Pipeline Optimization**: Performance tuning and error recovery
@@ -237,7 +264,7 @@ A generated video file must:
 4. **Validate**: Ensure all tests pass
 
 ### Current Test Status
-- **168 total tests** (166 passing, 2 skipped) across validation, service, and UI layers
+- **181 total tests** (179 passing, 2 skipped) across validation, service, and UI layers
 - **Story creation (U1)**: ✅ Complete with full-stack testing (backend + UI)
 - **Story dashboard**: ✅ Complete with comprehensive tests covering all states
 - **Script generation (U2)**: ✅ Complete with full test coverage for service logic and UI interactions
@@ -269,3 +296,7 @@ A generated video file must:
   - Prefer server actions to handle database interactions from the client side
   - Ensures secure and consistent database access
   - Helps avoid client-side Supabase initialization errors
+- **Tailwind CSS Configuration**:
+  - Use Tailwind CSS v3.4.x for stability (v4.x has breaking config changes)
+  - Ensure PostCSS config uses `tailwindcss: {}` not `@tailwindcss/postcss: {}`
+  - Clear Next.js cache (`rm -rf .next`) after Tailwind config changes
