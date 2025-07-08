@@ -28,13 +28,10 @@ export class ScriptService {
         temperature: 0.7,
       })
 
-      // Validate script length (≤45 words)
+      // Validate script length (≤50 words recommended)
       const wordCount = text.trim().split(/\s+/).length
-      if (wordCount > 45) {
-        throw new ScriptServiceError(
-          `Generated script too long: ${wordCount} words (max 45)`,
-          'SCRIPT_TOO_LONG'
-        )
+      if (wordCount > 50) {
+        console.warn(`⚠️  Generated script is longer than recommended: ${wordCount} words (recommended max 50)`)
       }
 
       // Save script to database
@@ -486,13 +483,10 @@ Split the script into logical beats and create 2-3 dynamic shots that bring this
       throw new ScriptServiceError('Invalid story ID format', 'VALIDATION_ERROR')
     }
 
-    // Validate script length (≤45 words)
+    // Validate script length (≤50 words recommended)
     const wordCount = text.trim().split(/\s+/).length
-    if (wordCount > 45) {
-      throw new ScriptServiceError(
-        `Script too long: ${wordCount} words (max 45)`,
-        'SCRIPT_TOO_LONG'
-      )
+    if (wordCount > 50) {
+      console.warn(`⚠️  Script is longer than recommended: ${wordCount} words (recommended max 50)`)
     }
 
     try {
@@ -528,7 +522,7 @@ Split the script into logical beats and create 2-3 dynamic shots that bring this
     let prompt = `Create a 10-15 second video script for a vertical newsbite format.
 
 Requirements:
-- 45 words maximum
+- 50 words maximum
 - Engaging, punchy delivery for social media
 - Focus on the key impact or significance
 - Written for voice-over narration
