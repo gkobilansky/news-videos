@@ -69,7 +69,7 @@ export class VideoGenerationService {
       // Build the storyboard request with optimized prompts
       const storyboardRequest = {
         model: storyboard.model || 'gen4_turbo',
-        ratio: storyboard.ratio || '720:1280', // Portrait format - using valid ratio
+        ratio: storyboard.ratio || '768:1280', // Portrait format - using valid ratio
         shots: storyboard.shots.map((shot: any, index: number) => ({
           promptText: shot.promptText,
           duration: shot.duration || 5,

@@ -353,8 +353,8 @@ Split the script into logical beats and create 2-3 dynamic shots that bring this
    * Validates storyboard shot structure
    */
   private validateStoryboardShots(shots: any[]): StoryboardShot[] {
-    if (!Array.isArray(shots) || shots.length !== 3) {
-      throw new ScriptServiceError('Storyboard must have exactly 3 shots', 'INVALID_SHOTS')
+    if (!Array.isArray(shots) || shots.length < 1) {
+      throw new ScriptServiceError('Storyboard must have at least 1 shot', 'INVALID_SHOTS')
     }
 
     return shots.map((shot, index) => {
@@ -539,6 +539,176 @@ ${sourcesText}`
     prompt += `\n\nGenerate only the script text, no additional formatting or explanations.`
 
     return prompt
+  }
+
+  /**
+   * Adds a new shot to the end of an existing storyboard
+   */
+  async addShotToStoryboard(storyId: string, newShot: StoryboardShot): Promise<Storyboard> {
+    if (!storyId || storyId.trim().length === 0) {
+      throw new ScriptServiceError('Invalid story ID format', 'VALIDATION_ERROR')
+    }
+
+    // Validate the new shot
+    this.validateSingleShot(newShot)
+
+    try {
+      // Get existing storyboard
+      const existingStoryboard = await this.getStoryboard(storyId)
+      if (!existingStoryboard) {
+        throw new ScriptServiceError('Storyboard not found', 'STORYBOARD_NOT_FOUND')
+      }
+
+      // Add new shot to the end
+      const updatedShots = [...existingStoryboard.shots, newShot]
+
+      // Update the storyboard
+      const { data, error } = await supabaseAdmin
+        .from('storyboards')
+        .update({
+          shots: updatedShots,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('story_id', storyId)
+        .select()
+        .single()
+
+      if (error) {
+        throw new ScriptServiceError(`Database error: ${error.message}`, 'DATABASE_ERROR')
+      }
+
+      return data as Storyboard
+    } catch (error) {
+      if (error instanceof ScriptServiceError) {
+        throw error
+      }
+      throw new ScriptServiceError(`Failed to add shot to storyboard: ${error}`, 'UNKNOWN_ERROR')
+    }
+  }
+
+  /**
+   * Inserts a new shot at a specific position in the storyboard
+   */
+  async insertShotAtPosition(storyId: string, position: number, newShot: StoryboardShot): Promise<Storyboard> {
+    if (!storyId || storyId.trim().length === 0) {
+      throw new ScriptServiceError('Invalid story ID format', 'VALIDATION_ERROR')
+    }
+
+    // Validate the new shot
+    this.validateSingleShot(newShot)
+
+    try {
+      // Get existing storyboard
+      const existingStoryboard = await this.getStoryboard(storyId)
+      if (!existingStoryboard) {
+        throw new ScriptServiceError('Storyboard not found', 'STORYBOARD_NOT_FOUND')
+      }
+
+      // Validate position bounds
+      if (position < 0 || position > existingStoryboard.shots.length) {
+        throw new ScriptServiceError('Invalid position', 'INVALID_POSITION')
+      }
+
+      // Insert shot at the specified position
+      const updatedShots = [...existingStoryboard.shots]
+      updatedShots.splice(position, 0, newShot)
+
+      // Update the storyboard
+      const { data, error } = await supabaseAdmin
+        .from('storyboards')
+        .update({
+          shots: updatedShots,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('story_id', storyId)
+        .select()
+        .single()
+
+      if (error) {
+        throw new ScriptServiceError(`Database error: ${error.message}`, 'DATABASE_ERROR')
+      }
+
+      return data as Storyboard
+    } catch (error) {
+      if (error instanceof ScriptServiceError) {
+        throw error
+      }
+      throw new ScriptServiceError(`Failed to insert shot at position: ${error}`, 'UNKNOWN_ERROR')
+    }
+  }
+
+  /**
+   * Removes a shot from the storyboard at a specific position
+   */
+  async removeShotFromStoryboard(storyId: string, position: number): Promise<Storyboard> {
+    if (!storyId || storyId.trim().length === 0) {
+      throw new ScriptServiceError('Invalid story ID format', 'VALIDATION_ERROR')
+    }
+
+    try {
+      // Get existing storyboard
+      const existingStoryboard = await this.getStoryboard(storyId)
+      if (!existingStoryboard) {
+        throw new ScriptServiceError('Storyboard not found', 'STORYBOARD_NOT_FOUND')
+      }
+
+      // Validate position bounds
+      if (position < 0 || position >= existingStoryboard.shots.length) {
+        throw new ScriptServiceError('Invalid position', 'INVALID_POSITION')
+      }
+
+      // Remove shot at the specified position
+      const updatedShots = [...existingStoryboard.shots]
+      updatedShots.splice(position, 1)
+
+      // Update the storyboard
+      const { data, error } = await supabaseAdmin
+        .from('storyboards')
+        .update({
+          shots: updatedShots,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('story_id', storyId)
+        .select()
+        .single()
+
+      if (error) {
+        throw new ScriptServiceError(`Database error: ${error.message}`, 'DATABASE_ERROR')
+      }
+
+      return data as Storyboard
+    } catch (error) {
+      if (error instanceof ScriptServiceError) {
+        throw error
+      }
+      throw new ScriptServiceError(`Failed to remove shot from storyboard: ${error}`, 'UNKNOWN_ERROR')
+    }
+  }
+
+  /**
+   * Validates a single shot structure
+   */
+  private validateSingleShot(shot: StoryboardShot): void {
+    if (!shot.promptText || typeof shot.promptText !== 'string' || shot.promptText.trim().length === 0) {
+      throw new ScriptServiceError('Invalid shot data: promptText is required', 'INVALID_SHOT_DATA')
+    }
+
+    if (!shot.duration || ![5, 10, 16].includes(shot.duration)) {
+      throw new ScriptServiceError('Invalid shot data: duration must be 5, 10, or 16', 'INVALID_SHOT_DATA')
+    }
+
+    if (shot.camera) {
+      const validMovements = ['static', 'dolly-in', 'dolly-out', 'pan-left', 'pan-right', 'tilt-up', 'tilt-down', 'handheld', 'zoom-in', 'zoom-out']
+      const validAngles = ['eye-level', 'low-angle', 'high-angle', 'bird-eye', 'worm-eye']
+
+      if (shot.camera.movement && !validMovements.includes(shot.camera.movement)) {
+        throw new ScriptServiceError('Invalid shot data: invalid camera movement', 'INVALID_SHOT_DATA')
+      }
+
+      if (shot.camera.angle && !validAngles.includes(shot.camera.angle)) {
+        throw new ScriptServiceError('Invalid shot data: invalid camera angle', 'INVALID_SHOT_DATA')
+      }
+    }
   }
 }
 

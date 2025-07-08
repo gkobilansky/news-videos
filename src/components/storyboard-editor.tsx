@@ -9,6 +9,9 @@ interface StoryboardEditorProps {
   onSave: (shots: StoryboardShot[]) => Promise<void>
   onGenerate: () => Promise<void>
   onGenerateVideo: () => void
+  onAddShot?: (newShot: StoryboardShot) => Promise<void>
+  onInsertShot?: (position: number, newShot: StoryboardShot) => Promise<void>
+  onRemoveShot?: (position: number) => Promise<void>
   isLoading?: boolean
 }
 
@@ -39,7 +42,7 @@ const durations = [
   { value: 16, label: '16 seconds' }
 ] as const
 
-export function StoryboardEditor({ story, storyboard, onSave, onGenerate, onGenerateVideo, isLoading = false }: StoryboardEditorProps) {
+export function StoryboardEditor({ story, storyboard, onSave, onGenerate, onGenerateVideo, onAddShot, onInsertShot, onRemoveShot, isLoading = false }: StoryboardEditorProps) {
   const [editedShots, setEditedShots] = useState<StoryboardShot[]>(
     storyboard?.shots || [
       {
@@ -68,6 +71,13 @@ export function StoryboardEditor({ story, storyboard, onSave, onGenerate, onGene
   }, [storyboard])
   
   const [isSaving, setIsSaving] = useState(false)
+  const [isAddingShot, setIsAddingShot] = useState(false)
+  const [newShotData, setNewShotData] = useState<StoryboardShot>({
+    promptText: '',
+    duration: 5,
+    camera: { movement: 'static', angle: 'eye-level' }
+  })
+  const [insertPosition, setInsertPosition] = useState<number | null>(null)
 
   const updateShot = (index: number, field: keyof StoryboardShot, value: any) => {
     setEditedShots(prev => prev.map((shot, i) => 
@@ -109,6 +119,63 @@ export function StoryboardEditor({ story, storyboard, onSave, onGenerate, onGene
     )
   }
 
+  const handleAddShot = async () => {
+    if (!onAddShot || !newShotData.promptText.trim()) return
+    
+    setIsAddingShot(true)
+    try {
+      await onAddShot(newShotData)
+      setNewShotData({
+        promptText: '',
+        duration: 5,
+        camera: { movement: 'static', angle: 'eye-level' }
+      })
+    } finally {
+      setIsAddingShot(false)
+    }
+  }
+
+  const handleInsertShot = async (position: number) => {
+    if (!onInsertShot || !newShotData.promptText.trim()) return
+    
+    setIsAddingShot(true)
+    try {
+      await onInsertShot(position, newShotData)
+      setNewShotData({
+        promptText: '',
+        duration: 5,
+        camera: { movement: 'static', angle: 'eye-level' }
+      })
+      setInsertPosition(null)
+    } finally {
+      setIsAddingShot(false)
+    }
+  }
+
+  const handleRemoveShot = async (position: number) => {
+    if (!onRemoveShot) return
+    
+    const confirmed = window.confirm('Are you sure you want to remove this shot?')
+    if (!confirmed) return
+    
+    try {
+      await onRemoveShot(position)
+    } catch (error) {
+      console.error('Failed to remove shot:', error)
+    }
+  }
+
+  const updateNewShotData = (field: keyof StoryboardShot, value: any) => {
+    setNewShotData(prev => ({ ...prev, [field]: value }))
+  }
+
+  const updateNewShotCamera = (property: 'movement' | 'angle', value: string) => {
+    setNewShotData(prev => ({
+      ...prev,
+      camera: { ...prev.camera, [property]: value }
+    }))
+  }
+
   return (
     <div className="max-w-4xl mx-auto p-6">
       <div className="mb-8">
@@ -145,6 +212,15 @@ export function StoryboardEditor({ story, storyboard, onSave, onGenerate, onGene
                 Shot {index + 1}
               </h3>
               <div className="flex items-center gap-2">
+                {onInsertShot && (
+                  <button
+                    onClick={() => setInsertPosition(index)}
+                    className="text-blue-600 hover:text-blue-800 text-sm"
+                    title="Insert shot before this one"
+                  >
+                    + Insert
+                  </button>
+                )}
                 <select
                   value={shot.duration}
                   onChange={(e) => updateShot(index, 'duration', parseInt(e.target.value))}
@@ -156,6 +232,15 @@ export function StoryboardEditor({ story, storyboard, onSave, onGenerate, onGene
                     </option>
                   ))}
                 </select>
+                {onRemoveShot && editedShots.length > 1 && (
+                  <button
+                    onClick={() => handleRemoveShot(index)}
+                    className="text-red-600 hover:text-red-800 text-sm"
+                    title="Remove this shot"
+                  >
+                    ✕
+                  </button>
+                )}
               </div>
             </div>
 
@@ -224,6 +309,176 @@ export function StoryboardEditor({ story, storyboard, onSave, onGenerate, onGene
             </div>
           </div>
         ))}
+
+        {/* Insert Shot Form */}
+        {insertPosition !== null && (
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
+            <h3 className="text-lg font-semibold text-blue-900 mb-4">
+              Insert New Shot at Position {insertPosition + 1}
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Visual Description
+                </label>
+                <textarea
+                  value={newShotData.promptText}
+                  onChange={(e) => updateNewShotData('promptText', e.target.value)}
+                  placeholder="Describe the visual content for this shot..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                  rows={3}
+                />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Duration
+                  </label>
+                  <select
+                    value={newShotData.duration}
+                    onChange={(e) => updateNewShotData('duration', parseInt(e.target.value))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    {durations.map(duration => (
+                      <option key={duration.value} value={duration.value}>
+                        {duration.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Camera Movement
+                  </label>
+                  <select
+                    value={newShotData.camera?.movement || 'static'}
+                    onChange={(e) => updateNewShotCamera('movement', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    {cameraMovements.map(movement => (
+                      <option key={movement.value} value={movement.value}>
+                        {movement.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Camera Angle
+                  </label>
+                  <select
+                    value={newShotData.camera?.angle || 'eye-level'}
+                    onChange={(e) => updateNewShotCamera('angle', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    {cameraAngles.map(angle => (
+                      <option key={angle.value} value={angle.value}>
+                        {angle.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => handleInsertShot(insertPosition)}
+                  disabled={!newShotData.promptText.trim() || isAddingShot}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isAddingShot ? 'Inserting...' : 'Insert Shot'}
+                </button>
+                <button
+                  onClick={() => setInsertPosition(null)}
+                  className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Add Shot Form */}
+        {onAddShot && storyboard && (
+          <div className="bg-green-50 border border-green-200 rounded-xl p-6">
+            <h3 className="text-lg font-semibold text-green-900 mb-4">
+              Add New Shot
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Visual Description
+                </label>
+                <textarea
+                  value={newShotData.promptText}
+                  onChange={(e) => updateNewShotData('promptText', e.target.value)}
+                  placeholder="Describe the visual content for this shot..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 resize-none"
+                  rows={3}
+                />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Duration
+                  </label>
+                  <select
+                    value={newShotData.duration}
+                    onChange={(e) => updateNewShotData('duration', parseInt(e.target.value))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                  >
+                    {durations.map(duration => (
+                      <option key={duration.value} value={duration.value}>
+                        {duration.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Camera Movement
+                  </label>
+                  <select
+                    value={newShotData.camera?.movement || 'static'}
+                    onChange={(e) => updateNewShotCamera('movement', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                  >
+                    {cameraMovements.map(movement => (
+                      <option key={movement.value} value={movement.value}>
+                        {movement.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Camera Angle
+                  </label>
+                  <select
+                    value={newShotData.camera?.angle || 'eye-level'}
+                    onChange={(e) => updateNewShotCamera('angle', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                  >
+                    {cameraAngles.map(angle => (
+                      <option key={angle.value} value={angle.value}>
+                        {angle.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <button
+                  onClick={handleAddShot}
+                  disabled={!newShotData.promptText.trim() || isAddingShot}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isAddingShot ? 'Adding...' : 'Add Shot'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Action Buttons */}

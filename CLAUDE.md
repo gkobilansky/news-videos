@@ -201,6 +201,23 @@ A generated video file must:
   - Error handling for failed video generation
   - Integration with video orchestration pipeline
 
+- **Manual Shot Creation**: Complete storyboard customization system (`/stories/[id]/storyboard`)
+  - **Service Layer**: New methods in `ScriptService` for shot management
+    - `addShotToStoryboard()` - Adds shots to the end of storyboard
+    - `insertShotAtPosition()` - Inserts shots at specific positions
+    - `removeShotFromStoryboard()` - Removes shots from storyboard
+    - `validateSingleShot()` - Validates shot data before operations
+  - **Server Actions**: Full CRUD operations via server actions
+    - `addShotToStoryboardAction()`, `insertShotAtPositionAction()`, `removeShotFromStoryboardAction()`
+  - **UI Components**: Rich interactive storyboard editor
+    - Insert shot controls with inline forms
+    - Remove shot controls with confirmation
+    - Add shot form for appending new shots
+    - Full shot configuration (duration, camera movement, angle, description)
+  - **Test Coverage**: 7 comprehensive tests covering all new functionality
+  - **TDD Implementation**: Tests written first, then implementation
+  - **Error Handling**: Robust validation and user feedback
+
 ### 🚧 Active Development Areas
 - **User Story U3**: Final video generation pipeline integration and testing
 - **Video Pipeline Optimization**: Performance tuning and error recovery
@@ -220,7 +237,7 @@ A generated video file must:
 4. **Validate**: Ensure all tests pass
 
 ### Current Test Status
-- **161 total tests** (159 passing, 2 skipped) across validation, service, and UI layers
+- **168 total tests** (166 passing, 2 skipped) across validation, service, and UI layers
 - **Story creation (U1)**: ✅ Complete with full-stack testing (backend + UI)
 - **Story dashboard**: ✅ Complete with comprehensive tests covering all states
 - **Script generation (U2)**: ✅ Complete with full test coverage for service logic and UI interactions
@@ -229,6 +246,11 @@ A generated video file must:
   - TTS service testing (OpenAI text-to-speech integration)
   - Video generation service testing (Runway ML API integration)
   - Video orchestration service testing (end-to-end pipeline coordination)
+- **Manual shot creation**: ✅ Complete with comprehensive test coverage:
+  - Service layer testing (add, insert, remove shots)
+  - Input validation and error handling
+  - Position bounds validation
+  - Shot data validation
 - **Video generation (U3)**: 🚧 Infrastructure complete, final integration testing in progress
 
 ## Project Guidance

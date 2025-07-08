@@ -6,7 +6,10 @@ import { StoryboardShot, Story, Storyboard } from '@/types'
 import { StoryboardEditor } from '@/components/storyboard-editor'
 import { 
   generateStoryboardAction,
-  updateStoryboardAction 
+  updateStoryboardAction,
+  addShotToStoryboardAction,
+  insertShotAtPositionAction,
+  removeShotFromStoryboardAction
 } from '@/app/actions/storyboard-actions'
 
 interface StoryboardPageClientProps {
@@ -59,6 +62,60 @@ export function StoryboardPageClient({ story, storyboard: initialStoryboard, sto
 
   const handleGenerateVideo = () => {
     router.push(`/stories/${storyId}/generate`)
+  }
+
+  const handleAddShot = async (newShot: StoryboardShot) => {
+    setError(null)
+    
+    try {
+      const result = await addShotToStoryboardAction(storyId, newShot)
+      
+      if (result.success) {
+        setStoryboard(result.storyboard)
+      } else {
+        setError(result.error)
+        throw new Error(result.error)
+      }
+    } catch (err) {
+      setError('Failed to add shot to storyboard')
+      throw err
+    }
+  }
+
+  const handleInsertShot = async (position: number, newShot: StoryboardShot) => {
+    setError(null)
+    
+    try {
+      const result = await insertShotAtPositionAction(storyId, position, newShot)
+      
+      if (result.success) {
+        setStoryboard(result.storyboard)
+      } else {
+        setError(result.error)
+        throw new Error(result.error)
+      }
+    } catch (err) {
+      setError('Failed to insert shot at position')
+      throw err
+    }
+  }
+
+  const handleRemoveShot = async (position: number) => {
+    setError(null)
+    
+    try {
+      const result = await removeShotFromStoryboardAction(storyId, position)
+      
+      if (result.success) {
+        setStoryboard(result.storyboard)
+      } else {
+        setError(result.error)
+        throw new Error(result.error)
+      }
+    } catch (err) {
+      setError('Failed to remove shot from storyboard')
+      throw err
+    }
   }
 
   return (
@@ -120,6 +177,9 @@ export function StoryboardPageClient({ story, storyboard: initialStoryboard, sto
         onSave={handleSave}
         onGenerate={handleGenerate}
         onGenerateVideo={handleGenerateVideo}
+        onAddShot={handleAddShot}
+        onInsertShot={handleInsertShot}
+        onRemoveShot={handleRemoveShot}
         isLoading={isGenerating}
       />
     </div>

@@ -238,11 +238,11 @@ export default function ScriptPage() {
             </button>
             
             <button
-              onClick={() => router.push(`/stories/${storyId}/generate`)}
-              disabled={!isValidLength || wordCount === 0}
+              onClick={() => router.push(`/stories/${storyId}/storyboard`)}
+              disabled={wordCount === 0}
               className="bg-purple-600 text-white py-2 px-6 rounded hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
             >
-              Continue to Generation
+              Continue to Storyboard
             </button>
           </div>
         )}
