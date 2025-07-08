@@ -266,7 +266,7 @@ export class FFmpegService {
     const segmentDuration = Math.floor(30 / inputs.videoFiles.length) // Split into equal segments
     const videoProcessing = inputs.videoFiles.map((_, index) => {
       const inputIndex = index + 1 // +1 because input 0 is audio
-      return `[${inputIndex}:v]trim=duration=${segmentDuration},scale=720:1280,setsar=1[v${index}]`
+      return `[${inputIndex}:v]trim=duration=${segmentDuration},scale=768:1280,setsar=1[v${index}]`
     }).join(';')
     
     const videoConcatenation = inputs.videoFiles.map((_, index) => `[v${index}]`).join('') + 

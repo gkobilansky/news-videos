@@ -140,25 +140,17 @@ describe('ScriptService', () => {
   })
 
   describe('prompt building', () => {
-    it('should build script prompt correctly', () => {
+    it('should build script prompt with story context', () => {
       const buildMethod = (scriptService as any).buildScriptPrompt.bind(scriptService)
       
       const prompt = buildMethod(mockStory)
       
-      expect(prompt).toContain('45 words maximum')
-      expect(prompt).toContain(mockStory.headline)
-      expect(prompt).toContain('Sources:')
-    })
-
-    it('should build storyboard prompt correctly', () => {
-      const buildMethod = (scriptService as any).buildStoryboardPrompt.bind(scriptService)
-      
-      const prompt = buildMethod(mockStory, [])
-      
-      expect(prompt).toContain('3-shot storyboard')
-      expect(prompt).toContain('720:1280')
-      expect(prompt).toContain(mockStory.headline)
-      expect(prompt).toContain('JSON')
+      expect(prompt).toContain('Test Headline')
+      expect(prompt).toContain('Test hot take')
+      expect(prompt).toContain('https://example.com/source1')
+      expect(prompt).toContain('45 words')
+      expect(prompt).toContain('Engaging')
+      expect(prompt).toContain('script')
     })
   })
 })

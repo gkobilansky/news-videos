@@ -575,8 +575,8 @@ describe('FFmpegService', () => {
       const filterComplex = command[filterComplexIndex + 1]
       
       // Should contain valid trim filters with duration
-      expect(filterComplex).toMatch(/\[1:v\]trim=duration=\d+,scale=720:1280,setsar=1\[v0\]/)
-      expect(filterComplex).toMatch(/\[2:v\]trim=duration=\d+,scale=720:1280,setsar=1\[v1\]/)
+      expect(filterComplex).toMatch(/\[1:v\]trim=duration=\d+,scale=768:1280,setsar=1\[v0\]/)
+      expect(filterComplex).toMatch(/\[2:v\]trim=duration=\d+,scale=768:1280,setsar=1\[v1\]/)
       
       // Should contain concatenation filter
       expect(filterComplex).toMatch(/\[v0\]\[v1\]concat=n=2:v=1:a=0\[concat\]/)

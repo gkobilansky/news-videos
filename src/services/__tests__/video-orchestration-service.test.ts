@@ -1,5 +1,5 @@
 import { VideoOrchestrationService, VideoOrchestrationServiceError } from '../video-orchestration-service'
-import { createMockStory, createMockScript, createMockAsset, createMockVideo } from '../../lib/test-utils'
+import { createMockStory, createMockScript, createMockAsset, createMockVideo, createMockStoryboard } from '../../lib/test-utils'
 import { Story, Script } from '../../types'
 
 // Mock all dependent services before importing orchestration service
@@ -11,7 +11,8 @@ jest.mock('../tts-service', () => ({
 
 jest.mock('../video-generation-service', () => ({
   videoGenerationService: {
-    generateVideoForStory: jest.fn()
+    generateVideoForStory: jest.fn(),
+    generateVideoFromStoryboard: jest.fn()
   }
 }))
 
@@ -31,7 +32,8 @@ jest.mock('../story-service', () => ({
 
 jest.mock('../script-service', () => ({
   scriptService: {
-    getScript: jest.fn()
+    getScript: jest.fn(),
+    getStoryboard: jest.fn()
   }
 }))
 
@@ -592,6 +594,309 @@ describe('VideoOrchestrationService', () => {
       expect(service.getStatusMessage('video')).toContain('Creating video')
       expect(service.getStatusMessage('assembly')).toContain('Assembling final')
       expect(service.getStatusMessage('unknown')).toContain('Processing')
+    })
+  })
+
+  describe('generateVideoForStoryWithStoryboard', () => {
+    it('should orchestrate video generation using storyboard with generated images', async () => {
+      const mockStory = createMockStory({
+        id: 'story-123',
+        headline: 'Breaking: Major tech breakthrough announced',
+        status: 'editing'
+      })
+
+      const mockScript = createMockScript({
+        story_id: 'story-123',
+        text: 'Major tech breakthrough announced today. This could revolutionize the industry. Scientists are excited about the possibilities.'
+      })
+
+      const mockStoryboard = createMockStoryboard({
+        id: 'storyboard-123',
+        story_id: 'story-123',
+        shots: [
+          {
+            promptText: 'Wide establishing shot of tech conference, cinematic lighting',
+            duration: 5,
+            camera: { movement: 'static', angle: 'eye-level' }
+          },
+          {
+            promptText: 'Close-up handheld shot of excited scientist, dramatic',
+            duration: 5,
+            camera: { movement: 'handheld', angle: 'low-angle' }
+          },
+          {
+            promptText: 'Dolly-in final shot showing breakthrough technology, warm tones',
+            duration: 5,
+            camera: { movement: 'dolly-in', angle: 'eye-level' }
+          }
+        ]
+      })
+
+      const mockAudioAsset = createMockAsset({
+        id: 'audio-123',
+        story_id: 'story-123',
+        kind: 'audio',
+        provider: 'openai',
+        filepath: 'assets/audio/story-123.wav'
+      })
+
+      const mockVideoResult = {
+        videoPath: 'assets/video/story-123-storyboard.mp4',
+        allClips: [
+          'assets/video/story-123-storyboard-shot1.mp4',
+          'assets/video/story-123-storyboard-shot2.mp4',
+          'assets/video/story-123-storyboard-shot3.mp4'
+        ],
+        duration: 15
+      }
+
+      const mockAssemblyResult = {
+        filepath: 'output/story-123.mp4',
+        durationSec: 15
+      }
+
+      const mockFinalVideo = createMockVideo({
+        id: 'final-123',
+        story_id: 'story-123',
+        filepath: 'output/story-123.mp4',
+        duration_sec: 15
+      })
+
+      // Mock service calls
+      mockStoryService.getStory.mockResolvedValue(mockStory)
+      mockScriptService.getScript.mockResolvedValue(mockScript)
+      mockScriptService.getStoryboard.mockResolvedValue(mockStoryboard)
+      mockStoryService.updateStoryStatus.mockResolvedValue(mockStory)
+      
+      mockTTSService.generateTTSForStory.mockResolvedValue(mockAudioAsset)
+      mockVideoGenerationService.generateVideoFromStoryboard.mockResolvedValue(mockVideoResult)
+      
+      mockFFmpegService.assembleVideo.mockResolvedValue(mockAssemblyResult)
+
+      // Mock video service
+      const mockVideoService = require('../video-service').videoService
+      mockVideoService.createVideo.mockResolvedValue(mockFinalVideo)
+
+      const result = await orchestrationService.generateVideoForStory('story-123')
+
+      // Verify the complete storyboard pipeline was executed
+      expect(mockStoryService.getStory).toHaveBeenCalledWith('story-123')
+      expect(mockScriptService.getScript).toHaveBeenCalledWith('story-123')
+      expect(mockScriptService.getStoryboard).toHaveBeenCalledWith('story-123')
+      
+      expect(mockStoryService.updateStoryStatus).toHaveBeenCalledWith('story-123', 'generating')
+      
+      expect(mockTTSService.generateTTSForStory).toHaveBeenCalledWith(
+        'story-123',
+        mockScript.text
+      )
+      
+      expect(mockVideoGenerationService.generateVideoFromStoryboard).toHaveBeenCalledWith(
+        'story-123',
+        mockStoryboard
+      )
+      
+      expect(mockFFmpegService.assembleVideo).toHaveBeenCalledWith(
+        'story-123',
+        {
+          audioFilepath: mockAudioAsset.filepath,
+          videoFilepath: mockVideoResult.allClips,
+          script: mockScript.text
+        }
+      )
+      
+      expect(mockVideoService.createVideo).toHaveBeenCalledWith({
+        story_id: 'story-123',
+        filepath: mockAssemblyResult.filepath,
+        duration_sec: mockAssemblyResult.durationSec
+      })
+      
+      expect(mockStoryService.updateStoryStatus).toHaveBeenCalledWith('story-123', 'done')
+
+      expect(result).toEqual(mockFinalVideo)
+    })
+
+    it('should fall back to legacy video generation if no storyboard exists', async () => {
+      const mockStory = createMockStory({
+        id: 'story-123',
+        headline: 'Breaking: Major tech breakthrough announced',
+        status: 'editing'
+      })
+
+      const mockScript = createMockScript({
+        story_id: 'story-123',
+        text: 'Major tech breakthrough announced today.'
+      })
+
+      const mockAudioAsset = createMockAsset({
+        id: 'audio-123',
+        story_id: 'story-123',
+        kind: 'audio',
+        provider: 'openai',
+        filepath: 'assets/audio/story-123.wav'
+      })
+
+      const mockVideoAsset = createMockAsset({
+        id: 'video-123', 
+        story_id: 'story-123',
+        kind: 'video',
+        provider: 'runway',
+        filepath: 'assets/video/story-123.mp4'
+      })
+
+      const mockAssemblyResult = {
+        filepath: 'output/story-123.mp4',
+        durationSec: 15
+      }
+
+      const mockFinalVideo = createMockVideo({
+        id: 'final-123',
+        story_id: 'story-123',
+        filepath: 'output/story-123.mp4',
+        duration_sec: 15
+      })
+
+      // Mock service calls - no storyboard available
+      mockStoryService.getStory.mockResolvedValue(mockStory)
+      mockScriptService.getScript.mockResolvedValue(mockScript)
+      mockScriptService.getStoryboard.mockResolvedValue(null)
+      mockStoryService.updateStoryStatus.mockResolvedValue(mockStory)
+      
+      mockTTSService.generateTTSForStory.mockResolvedValue(mockAudioAsset)
+      mockVideoGenerationService.generateVideoForStory.mockResolvedValue(mockVideoAsset)
+      
+      mockFFmpegService.assembleVideo.mockResolvedValue(mockAssemblyResult)
+
+      // Mock video service
+      const mockVideoService = require('../video-service').videoService
+      mockVideoService.createVideo.mockResolvedValue(mockFinalVideo)
+
+      const result = await orchestrationService.generateVideoForStory('story-123')
+
+      // Verify it falls back to legacy approach
+      expect(mockScriptService.getStoryboard).toHaveBeenCalledWith('story-123')
+      expect(mockVideoGenerationService.generateVideoFromStoryboard).not.toHaveBeenCalled()
+      expect(mockVideoGenerationService.generateVideoForStory).toHaveBeenCalledWith(
+        'story-123',
+        expect.stringContaining('tech breakthrough')
+      )
+      
+      expect(result).toEqual(mockFinalVideo)
+    })
+
+    it('should handle storyboard video generation errors gracefully', async () => {
+      const mockStory = createMockStory({
+        id: 'story-123',
+        status: 'editing'
+      })
+
+      const mockScript = createMockScript({
+        story_id: 'story-123',
+        text: 'Test script'
+      })
+
+      const mockStoryboard = createMockStoryboard({
+        story_id: 'story-123'
+      })
+
+      const mockAudioAsset = createMockAsset({
+        kind: 'audio',
+        filepath: 'assets/audio/story-123.wav'
+      })
+
+      mockStoryService.getStory.mockResolvedValue(mockStory)
+      mockScriptService.getScript.mockResolvedValue(mockScript)
+      mockScriptService.getStoryboard.mockResolvedValue(mockStoryboard)
+      mockStoryService.updateStoryStatus.mockResolvedValue(mockStory)
+      
+      mockTTSService.generateTTSForStory.mockResolvedValue(mockAudioAsset)
+      mockVideoGenerationService.generateVideoFromStoryboard.mockRejectedValue(new Error('Storyboard video generation failed'))
+
+      await expect(
+        orchestrationService.generateVideoForStory('story-123')
+      ).rejects.toThrow(VideoOrchestrationServiceError)
+
+      expect(mockStoryService.updateStoryStatus).toHaveBeenCalledWith('story-123', 'failed')
+    })
+  })
+
+  describe('generateAdditionalVideoForStoryWithStoryboard', () => {
+    it('should generate additional video using storyboard without changing story status', async () => {
+      const mockStory = createMockStory({
+        id: 'story-123',
+        headline: 'Breaking: Major tech breakthrough announced',
+        status: 'done'
+      })
+
+      const mockScript = createMockScript({
+        story_id: 'story-123',
+        text: 'Major tech breakthrough announced today.'
+      })
+
+      const mockStoryboard = createMockStoryboard({
+        story_id: 'story-123'
+      })
+
+      const mockAudioAsset = createMockAsset({
+        id: 'audio-123',
+        story_id: 'story-123',
+        kind: 'audio',
+        provider: 'openai',
+        filepath: 'assets/audio/story-123.wav'
+      })
+
+      const mockVideoResult = {
+        videoPath: 'assets/video/story-123-storyboard-2.mp4',
+        allClips: [
+          'assets/video/story-123-storyboard-2-shot1.mp4',
+          'assets/video/story-123-storyboard-2-shot2.mp4',
+          'assets/video/story-123-storyboard-2-shot3.mp4'
+        ],
+        duration: 15
+      }
+
+      const mockAssemblyResult = {
+        filepath: 'output/story-123-2.mp4',
+        durationSec: 15
+      }
+
+      const mockFinalVideo = createMockVideo({
+        id: 'final-124',
+        story_id: 'story-123',
+        filepath: 'output/story-123-2.mp4',
+        duration_sec: 15
+      })
+
+      // Mock service calls
+      mockStoryService.getStory.mockResolvedValue(mockStory)
+      mockScriptService.getScript.mockResolvedValue(mockScript)
+      mockScriptService.getStoryboard.mockResolvedValue(mockStoryboard)
+      
+      mockTTSService.generateTTSForStory.mockResolvedValue(mockAudioAsset)
+      mockVideoGenerationService.generateVideoFromStoryboard.mockResolvedValue(mockVideoResult)
+      
+      mockFFmpegService.assembleVideo.mockResolvedValue(mockAssemblyResult)
+
+      // Mock video service
+      const mockVideoService = require('../video-service').videoService
+      mockVideoService.createVideo.mockResolvedValue(mockFinalVideo)
+
+      const result = await orchestrationService.generateAdditionalVideoForStory('story-123')
+
+      // Verify the pipeline was executed but story status was NOT changed
+      expect(mockStoryService.getStory).toHaveBeenCalledWith('story-123')
+      expect(mockScriptService.getScript).toHaveBeenCalledWith('story-123')
+      expect(mockScriptService.getStoryboard).toHaveBeenCalledWith('story-123')
+      
+      // Should NOT call updateStoryStatus for additional videos
+      expect(mockStoryService.updateStoryStatus).not.toHaveBeenCalled()
+      
+      expect(mockVideoGenerationService.generateVideoFromStoryboard).toHaveBeenCalledWith(
+        'story-123',
+        mockStoryboard
+      )
+
+      expect(result).toEqual(mockFinalVideo)
     })
   })
 })

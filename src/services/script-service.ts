@@ -1,7 +1,7 @@
-import { Story, Script, Storyboard, StoryboardShot, SourceContent } from '@/types'
-import { supabaseAdmin } from '@/lib/supabase'
+import { Story, Script, Storyboard, StoryboardShot, SourceContent } from '../types'
+import { supabaseAdmin } from '../lib/supabase'
 import { openai } from '@ai-sdk/openai'
-import { generateText, tool } from 'ai'
+import { generateText } from 'ai'
 import { z } from 'zod'
 
 export class ScriptServiceError extends Error {
@@ -62,37 +62,92 @@ export class ScriptService {
   }
 
   /**
-   * Generates a 3-shot storyboard for a story using OpenAI with source content
+   * Generates a storyboard for a story using AI with optimized prompts for Runway
    */
   async generateStoryboard(story: Story): Promise<Storyboard> {
-    try {
-      // Fetch source content for better context
-      let sourceContent: SourceContent[] = []
-      try {
-        sourceContent = await this.fetchSourcesContent(story.sources)
-      } catch (error) {
-        console.warn('Failed to fetch source content, proceeding without:', error)
-      }
+    if (!story) {
+      throw new ScriptServiceError('Story is required', 'VALIDATION_ERROR')
+    }
 
-      // Create enhanced prompt with source content
-      const prompt = this.buildStoryboardPrompt(story, sourceContent)
-      
-      // Generate storyboard using OpenAI - structured for JSON output
+    // Get the script for this story to split into logical beats
+    const script = await this.getScript(story.id)
+    if (!script) {
+      throw new ScriptServiceError('Script must exist before generating storyboard', 'SCRIPT_NOT_FOUND')
+    }
+
+    // Fetch source content for context
+    const sourcesContent = await this.fetchSourcesContent(story.sources)
+
+    try {
       const { text } = await generateText({
         model: openai('gpt-4o-mini'),
-        prompt,
-        maxTokens: 1000,
-        temperature: 0.3, // Lower temperature for more consistent JSON structure
-        // Remove tools for now to ensure cleaner JSON response
+        temperature: 0.7,
+        messages: [
+          {
+            role: 'system',
+            content: `You are a professional video storyboard creator specializing in news content for Runway ML Gen-4.
+
+CRITICAL WORKFLOW REQUIREMENTS:
+1. Split the script into 2-3 logical beats/segments
+2. Create ONE shot per beat (2-3 shots total)
+3. Each shot should be 5-10 seconds (total video 10-15 seconds)
+4. Use motion-centric, action-focused prompts
+5. Avoid negatives and conversational fluff
+6. Include presenter/anchor references for consistency
+
+SHOT DISTRIBUTION STRATEGY:
+- 2 shots: Establishing shot + Close-up/detail shot
+- 3 shots: Wide establishing + Medium focus + Close resolution
+
+PROMPT STYLE GUIDE:
+✅ Good: "handheld camera follows presenter walking through newsroom"
+✅ Good: "dolly-in on anchor gesturing at data visualization"
+✅ Good: "dynamic pan across breaking news graphics"
+❌ Avoid: "don't show sad faces"
+❌ Avoid: "the anchor is talking about..."
+
+REFERENCE IMAGES:
+- Use @anchor tag in prompts for presenter consistency
+- Include camera movements and angles
+- Focus on visual storytelling, not dialogue
+
+Return a JSON object with this exact structure:
+{
+  "model": "gen4_turbo",
+  "ratio": "768:1280",
+  "shots": [
+    {
+      "promptText": "motion-centric action description with @anchor tag",
+      "duration": 5,
+      "camera": {
+        "movement": "dolly-in|dolly-out|pan-left|pan-right|handheld|static|zoom-in|zoom-out",
+        "angle": "eye-level|low-angle|high-angle|bird-eye|worm-eye"
+      }
+    }
+  ],
+  "fps": 24,
+  "output_format": "mp4"
+}`
+          },
+          {
+            role: 'user',
+            content: `Create a storyboard for this news story:
+
+HEADLINE: ${story.headline}
+HOT TAKE: ${story.hot_take || 'N/A'}
+SCRIPT TO SPLIT: "${script.text}"
+
+SOURCES: ${story.sources.map((url, index) => `${index}: ${url}`).join('\n')}
+
+${sourcesContent.length > 0 ? 'SOURCE CONTENT:\n' + sourcesContent.map((content, i) => `${i + 1}. ${content.title || 'Source'}: ${content.content.substring(0, 200)}...`).join('\n') : ''}
+
+Split the script into logical beats and create 2-3 dynamic shots that bring this news story to life. Each shot should advance the narrative and use engaging camera work.`
+          }
+        ]
       })
 
-      // Log the raw response for debugging
-      console.log('🤖 Raw OpenAI response:', text)
-      console.log('🤖 Response length:', text.length)
-      console.log('🤖 First 200 chars:', text.substring(0, 200))
+      let storyboardData: any
 
-      // Parse and validate the storyboard JSON
-      let storyboardData
       try {
         let jsonText = text.trim()
         
@@ -115,7 +170,7 @@ export class ScriptService {
           jsonText = jsonText.substring(0, lastBraceIndex + 1)
         }
         
-        console.log('🤖 Cleaned JSON text:', jsonText.substring(0, 300) + '...')
+        console.log('🎬 Generated storyboard JSON:', jsonText.substring(0, 200) + '...')
         storyboardData = JSON.parse(jsonText)
         
         // Verify it has the expected structure
@@ -130,16 +185,16 @@ export class ScriptService {
         throw new ScriptServiceError(`Invalid JSON response from AI: ${errorMessage}`, 'INVALID_JSON')
       }
 
-      // Validate storyboard structure
-      const validatedShots = this.validateStoryboardShots(storyboardData.shots)
+      // Validate and optimize storyboard structure
+      const validatedShots = this.validateAndOptimizeShots(storyboardData.shots)
 
-      // Create storyboard object
+      // Create storyboard object with optimized settings
       const storyboard: Omit<Storyboard, 'id' | 'created_at' | 'updated_at'> = {
         story_id: story.id,
-        model: 'gen4_turbo',
-        ratio: '720:1280', // Portrait format for vertical videos
+        model: 'gen4_turbo', // Use turbo for faster processing
+        ratio: '768:1280', // Portrait format optimized for social media
         shots: validatedShots,
-        fps: 24,
+        fps: 24, // Standard frame rate
         output_format: 'mp4'
       }
 
@@ -158,7 +213,9 @@ export class ScriptService {
         throw new ScriptServiceError(`Database error: ${error.message}`, 'DATABASE_ERROR')
       }
 
+      console.log('✅ Storyboard generated successfully with', validatedShots.length, 'optimized shots')
       return data as Storyboard
+
     } catch (error) {
       if (error instanceof ScriptServiceError) {
         throw error
@@ -324,75 +381,69 @@ export class ScriptService {
   }
 
   /**
-   * Builds enhanced storyboard prompt with source content
+   * Validates and optimizes storyboard shots according to Runway best practices
    */
-  private buildStoryboardPrompt(story: Story, sourceContent: SourceContent[]): string {
-    const sourcesText = story.sources.map((url, i) => `${i + 1}. ${url}`).join('\n')
+  private validateAndOptimizeShots(shots: any[]): StoryboardShot[] {
+    if (!Array.isArray(shots) || shots.length === 0) {
+      throw new ScriptServiceError('Storyboard must have at least one shot', 'VALIDATION_ERROR')
+    }
+
+    if (shots.length > 3) {
+      // Limit to 3 shots for optimal performance and credits
+      shots = shots.slice(0, 3)
+      console.log('🎬 Limited storyboard to 3 shots for optimal performance')
+    }
+
+    return shots.map((shot, index) => {
+      // Validate required fields
+      if (!shot.promptText || typeof shot.promptText !== 'string') {
+        throw new ScriptServiceError(`Shot ${index + 1} missing valid promptText`, 'VALIDATION_ERROR')
+      }
+
+      if (!shot.duration || typeof shot.duration !== 'number') {
+        throw new ScriptServiceError(`Shot ${index + 1} missing valid duration`, 'VALIDATION_ERROR')
+      }
+
+      // Optimize prompt text for Runway
+      let optimizedPrompt = shot.promptText.trim()
+      
+      // Ensure motion-centric language
+      if (!this.hasMotionWords(optimizedPrompt)) {
+        const cameraMovement = shot.camera?.movement || 'static'
+        optimizedPrompt = `${cameraMovement} shot: ${optimizedPrompt}`
+      }
+
+      // Ensure it's action-focused and concise
+      if (optimizedPrompt.length > 200) {
+        optimizedPrompt = optimizedPrompt.substring(0, 197) + '...'
+      }
+
+      // Validate duration constraints for Gen-4 Turbo
+      const validDurations = [5, 10, 16]
+      const duration = validDurations.includes(shot.duration) ? shot.duration : 5
+
+      return {
+        promptText: optimizedPrompt,
+        duration: duration as 5 | 10 | 16,
+        camera: {
+          movement: shot.camera?.movement || 'static',
+          angle: shot.camera?.angle || 'eye-level'
+        }
+      }
+    })
+  }
+
+  /**
+   * Checks if prompt contains motion-centric words
+   */
+  private hasMotionWords(prompt: string): boolean {
+    const motionWords = [
+      'camera', 'shot', 'dolly', 'pan', 'zoom', 'handheld', 'tracking',
+      'follows', 'moves', 'sweeps', 'glides', 'pushes', 'pulls'
+    ]
     
-    let prompt = `You are a professional video producer creating a storyboard for news content. Your task is to generate a JSON object for a 3-shot storyboard.
-
-CRITICAL: Your response must be ONLY valid JSON. No explanation, no markdown, no additional text.
-
-Requirements:
-- Exactly 3 shots, each 5 seconds duration
-- Portrait format (720:1280) for vertical video
-- Each shot should have compelling visual narrative
-- Include camera movements for dynamic footage
-- Focus on news storytelling best practices
-
-Expected JSON structure (respond with ONLY this JSON):
-{
-  "shots": [
-    {
-      "promptText": "Shot 1: Wide establishing shot description with specific visual details",
-      "duration": 5,
-      "camera": {
-        "movement": "static",
-        "angle": "eye-level"
-      }
-    },
-    {
-      "promptText": "Shot 2: Medium or close-up shot description focusing on key elements",
-      "duration": 5,
-      "camera": {
-        "movement": "dolly-in",
-        "angle": "low-angle"
-      }
-    },
-    {
-      "promptText": "Shot 3: Concluding shot description that provides resolution or context",
-      "duration": 5,
-      "camera": {
-        "movement": "static",
-        "angle": "eye-level"
-      }
-    }
-  ]
-}
-
-Valid camera movements: static, dolly-in, dolly-out, pan-left, pan-right, tilt-up, tilt-down, handheld, zoom-in, zoom-out
-Valid camera angles: eye-level, low-angle, high-angle, bird-eye, worm-eye
-
-Story Details:
-Headline: ${story.headline}
-
-Sources:
-${sourcesText}`
-
-    if (story.hot_take) {
-      prompt += `\n\nHot Take: ${story.hot_take}`
-    }
-
-    if (sourceContent.length > 0) {
-      prompt += `\n\nSource Content Context:`
-      sourceContent.forEach((content, i) => {
-        prompt += `\n\n${i + 1}. ${content.title || 'Source'}: ${content.content.substring(0, 300)}...`
-      })
-    }
-
-    prompt += `\n\nIMPORTANT: Respond with ONLY the JSON object. No other text. Start with { and end with }.`
-
-    return prompt
+    const lowercasePrompt = prompt.toLowerCase()
+    return motionWords.some(word => lowercasePrompt.includes(word))
   }
 
   /**

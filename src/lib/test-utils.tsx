@@ -68,7 +68,7 @@ export const createMockStoryboard = (overrides = {}) => ({
   id: 'test-storyboard-id',
   story_id: 'test-story-id',
   model: 'gen4_turbo' as const,
-  ratio: '720:1280' as const,
+  ratio: '768:1280' as const,
   shots: [
     {
       promptText: 'Wide establishing shot of news scene, cinematic lighting',

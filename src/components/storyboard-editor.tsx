@@ -116,7 +116,7 @@ export function StoryboardEditor({ story, storyboard, onSave, onGenerate, onGene
         <p className="text-gray-600">Edit your 3-shot storyboard for "{story.headline}"</p>
         <div className="mt-4 flex items-center gap-4 text-sm text-gray-500">
           <span>Total Duration: <strong>{getTotalDuration()}s</strong></span>
-          <span>Format: <strong>Portrait (720:1280)</strong></span>
+          <span>Format: <strong>Portrait (768:1280)</strong></span>
           <span>Model: <strong>Runway Gen-4 Turbo</strong></span>
         </div>
       </div>
