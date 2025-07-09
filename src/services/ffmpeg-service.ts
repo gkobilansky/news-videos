@@ -194,38 +194,6 @@ export class FFmpegService {
     }
   }
 
-  async assembleVideoForStory(storyId: string, assets: VideoAssemblyAssets): Promise<Video> {
-    let assembledFilepath: string | null = null
-
-    try {
-      const { filepath, durationSec } = await this.assembleVideo(storyId, assets)
-      assembledFilepath = filepath
-
-      const video = await this.createFinalVideo(storyId, filepath, durationSec)
-      
-      return video
-    } catch (error) {
-      if (assembledFilepath) {
-        try {
-          await fs.unlink(assembledFilepath)
-        } catch (cleanupError) {
-          if (process.env.NODE_ENV !== 'test') {
-            console.error('Failed to cleanup video file:', cleanupError)
-          }
-        }
-      }
-
-      if (error instanceof FFmpegServiceError) {
-        throw error
-      }
-
-      throw new FFmpegServiceError(
-        'Failed to assemble video for story',
-        'STORY_ASSEMBLY_FAILED'
-      )
-    }
-  }
-
   private async verifyInputFiles(filepaths: string[]): Promise<void> {
     try {
       await Promise.all(filepaths.map(filepath => fs.access(filepath)))

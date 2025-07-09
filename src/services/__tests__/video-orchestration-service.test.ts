@@ -19,7 +19,6 @@ jest.mock('../video-generation-service', () => ({
 jest.mock('../ffmpeg-service', () => ({
   ffmpegService: {
     assembleVideo: jest.fn(),
-    assembleVideoForStory: jest.fn()
   }
 }))
 
