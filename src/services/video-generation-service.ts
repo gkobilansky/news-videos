@@ -37,7 +37,7 @@ export class VideoGenerationService {
     })
   }
 
-  async generateVideoFromStoryboard(storyId: string, storyboard: any, takeNumber?: number, model: string = 'gen3a_turbo'): Promise<VideoGenerationResult> {
+  async generateVideoFromStoryboard(storyId: string, storyboard: any, takeNumber?: number, model: 'gen3a_turbo' | 'gen4_turbo' = 'gen3a_turbo'): Promise<VideoGenerationResult> {
     if (!storyId || !storyId.trim()) {
       throw new VideoGenerationServiceError('Story ID is required', 'INVALID_STORY_ID')
     }
@@ -403,7 +403,7 @@ export class VideoGenerationService {
     }
   }
 
-  private async createVideoFromImageTask(imagePathOrUrl: string, prompt: string, model: string = 'gen3a_turbo', retryCount: number = 0): Promise<RunwayTask> {
+  private async createVideoFromImageTask(imagePathOrUrl: string, prompt: string, model: 'gen3a_turbo' | 'gen4_turbo' = 'gen3a_turbo', retryCount: number = 0): Promise<RunwayTask> {
     const maxRetries = 3
     
     try {

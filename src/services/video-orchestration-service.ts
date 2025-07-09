@@ -115,7 +115,7 @@ export class VideoOrchestrationService {
     }
   }
 
-  async generateAdditionalVideoForStory(storyId: string, model: string = 'gen3a_turbo'): Promise<Video> {
+  async generateAdditionalVideoForStory(storyId: string, model: 'gen3a_turbo' | 'gen4_turbo' = 'gen3a_turbo'): Promise<Video> {
     if (!storyId || !storyId.trim()) {
       throw new VideoOrchestrationServiceError('Story ID is required', 'INVALID_STORY_ID')
     }
@@ -257,7 +257,7 @@ export class VideoOrchestrationService {
     return fullPrompt
   }
 
-  private async generateVideoAssets(storyId: string, story: Story, model: string = 'gen3a_turbo'): Promise<string[]> {
+  private async generateVideoAssets(storyId: string, story: Story, model: 'gen3a_turbo' | 'gen4_turbo' = 'gen3a_turbo'): Promise<string[]> {
     // First, try to get storyboard for this story
     let storyboard: Storyboard | null = null
     try {
