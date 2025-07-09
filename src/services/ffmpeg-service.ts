@@ -3,6 +3,7 @@ import { Video } from '../types'
 import { spawn } from 'child_process'
 import fs from 'fs/promises'
 import path from 'path'
+import { stringifySync } from 'subtitle'
 
 export class FFmpegServiceError extends Error {
   constructor(message: string, public code?: string) {
@@ -218,9 +219,27 @@ export class FFmpegService {
     
     const captionFile = path.join(captionDir, `${storyId}.srt`)
     
-    // Break script into synchronized chunks (3-5 words per caption)
+    // Break script into synchronized chunks (2-word chunks for readability)
     const chunks = this.createCaptionChunks(script)
-    const srtContent = this.generateSRTContent(chunks, audioDurationMs)
+    
+    // Create subtitle cues using the subtitle library
+    const cues = chunks.map((chunk, index) => {
+      const timePerChunk = audioDurationMs / chunks.length
+      const startTime = Math.round(index * timePerChunk)
+      const endTime = Math.round((index + 1) * timePerChunk)
+      
+      return {
+        type: 'cue' as const,
+        data: {
+          start: startTime,
+          end: endTime,
+          text: chunk
+        }
+      }
+    })
+    
+    // Generate SRT content using subtitle library (defaults to SRT format)
+    const srtContent = stringifySync(cues, { format: 'SRT' })
     
     await fs.writeFile(captionFile, srtContent)
     
@@ -264,27 +283,6 @@ export class FFmpegService {
     return chunks
   }
 
-  private getOptimalChunkSize(words: string[], currentIndex: number): number {
-    // This method is no longer used but kept for backwards compatibility
-    return 2
-  }
-
-  private generateSRTContent(chunks: string[], audioDurationMs: number): string {
-    let srtContent = ''
-    const chunkDurationMs = audioDurationMs / chunks.length
-    
-    chunks.forEach((chunk, index) => {
-      const startTimeMs = index * chunkDurationMs
-      const endTimeMs = (index + 1) * chunkDurationMs
-      
-      const startTime = this.formatSRTTimestamp(startTimeMs)
-      const endTime = this.formatSRTTimestamp(endTimeMs)
-      
-      srtContent += `${index + 1}\n${startTime} --> ${endTime}\n${chunk}\n\n`
-    })
-
-    return srtContent
-  }
 
   private async buildFFmpegCommand(
     inputs: { audioFile: string; videoFiles: string[]; captionFile: string; shotDurations?: number[] },
