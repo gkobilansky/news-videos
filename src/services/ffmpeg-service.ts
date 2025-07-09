@@ -290,23 +290,23 @@ export class FFmpegService {
     inputs: { audioFile: string; videoFiles: string[]; captionFile: string; shotDurations?: number[] },
     outputFile: string
   ): Promise<string[]> {
-    // Enhanced subtitle styling for exciting, modern captions
+    // Enhanced subtitle styling optimized for vertical video format (768x1280)
     const subtitleStyle = [
       'Fontname=Arial Black',       // Bold, impactful font
-      'Fontsize=24',               // Larger, more readable font size
+      'Fontsize=18',               // Reduced font size to fit vertical format
       'PrimaryColour=&Hffffff&',   // Pure white text
       'SecondaryColour=&H00ffff&', // Cyan secondary color for effects
       'OutlineColour=&H000000&',   // Black outline
       'BackColour=&H40000000&',    // Semi-transparent black background (more opaque)
-      'Outline=3',                 // Thicker outline for better contrast
-      'Shadow=2',                  // Stronger drop shadow
+      'Outline=2',                 // Reduced outline thickness
+      'Shadow=1',                  // Reduced drop shadow
       'Bold=1',                    // Bold text
-      'ScaleX=105',                // Slightly wider text for impact
-      'ScaleY=105',                // Slightly taller text
+      'ScaleX=100',                // Normal width scaling
+      'ScaleY=100',                // Normal height scaling
       'Spacing=1',                 // Slightly spaced letters for clarity
-      'MarginV=80',                // Higher bottom margin for better positioning
-      'MarginL=60',                // Wider left margin to ensure text fits
-      'MarginR=60',                // Wider right margin to ensure text fits
+      'MarginV=120',               // Bottom margin optimized for 1280px height
+      'MarginL=40',                // Left margin optimized for 768px width
+      'MarginR=40',                // Right margin optimized for 768px width
       'Alignment=2',               // Bottom center alignment
       'BorderStyle=3',             // Box background style
       'WrapStyle=0'                // No word wrapping (we control chunks)

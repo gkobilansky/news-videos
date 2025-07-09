@@ -63,9 +63,10 @@ export class VideoGenerationService {
       console.log(`✅ Found ${existingImages.length} existing reference images`)
 
       // Build the storyboard request with optimized prompts
+      const selectedModel = model || 'gen3a_turbo'
       const storyboardRequest = {
-        model: model || 'gen3a_turbo',
-        ratio: storyboard.ratio || '768:1280', // Portrait format - using valid ratio for both models
+        model: selectedModel,
+        ratio: storyboard.ratio || this.getPortraitRatioForModel(selectedModel),
         shots: storyboard.shots.map((shot: any, index: number) => ({
           promptText: shot.promptText,
           duration: shot.duration || 5,
@@ -428,7 +429,7 @@ export class VideoGenerationService {
           promptText: prompt,
           promptImage: promptImage,
           duration: 10,
-          ratio: '768:1280' // Portrait format - using valid ratio for both models
+          ratio: this.getPortraitRatioForModel(model)
         })
         .waitForTaskOutput({
           timeout: this.POLLING_TIMEOUT_MS
@@ -703,6 +704,19 @@ export class VideoGenerationService {
         `Failed to convert image to data URI: ${error instanceof Error ? error.message : String(error)}`,
         'IMAGE_CONVERSION_FAILED'
       )
+    }
+  }
+
+  private getPortraitRatioForModel(model: 'gen3a_turbo' | 'gen4_turbo'): string {
+    // Gen-3 Alpha Turbo: 768:1280 (portrait) or 1280:768 (landscape)
+    // Gen-4 Turbo: 720:1280, 832:1104 (portrait) or 1280:720, 1584:672, 1104:832 (landscape) or 960:960 (square)
+    switch (model) {
+      case 'gen3a_turbo':
+        return '768:1280' // Portrait format for Gen-3
+      case 'gen4_turbo':
+        return '720:1280' // Portrait format for Gen-4
+      default:
+        return '768:1280' // Default to Gen-3 format
     }
   }
 }

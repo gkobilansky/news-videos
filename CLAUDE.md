@@ -10,7 +10,7 @@ This is a **Vertical Newsbite Generator** - a self-hosted Next.js application th
 
 - **Frontend/API**: Next.js 14 with App Router, React Server Components + Server Actions
 - **Database**: Supabase Postgres (Docker) or SQLite via Prisma
-- **AI Services**: OpenAI AI SDK for chat completions and TTS, Runway Gen-3 for video generation
+- **AI Services**: OpenAI AI SDK for chat completions and TTS, Runway Gen-3/Gen-4 for video generation
 - **Video Processing**: Local ffmpeg for video assembly and processing
 - **Storage**: Local filesystem (`/assets`, `/output`) with DB storing relative paths
 
@@ -20,7 +20,7 @@ This is a **Vertical Newsbite Generator** - a self-hosted Next.js application th
 2. **Script Generation**: OpenAI chat completions generate ≤45 word script with RAG prompt
 3. **Asset Generation**: 
    - TTS via OpenAI (`tts-1` model, `alloy_news` voice) → WAV + timestamps
-   - Video b-roll via Runway Gen-3 two-step process:
+   - Video b-roll via Runway Gen-3/Gen-4 two-step process:
      * Text-to-Image: Generate portrait format image (768x1344) from script prompt
      * Image-to-Video: Convert image to 10-second video with motion
    - Optional charts via DALL·E or QuickChart
@@ -78,7 +78,7 @@ open output/<storyId>.mp4  # View generated videos
 
 ```env
 OPENAI_API_KEY=          # OpenAI API for chat + TTS
-RUNWAY_API_KEY=          # Runway Gen-3 for video generation  
+RUNWAY_API_KEY=          # Runway Gen-3/Gen-4 for video generation  
 DATABASE_URL=            # Postgres connection (if using Supabase)
 ```
 
@@ -146,6 +146,10 @@ Use the **Supabase CLI** for all database operations:
 - AI services have rate limits - implement retry logic and exponential backoff
 - Large video files require streaming responses for download links
 - Cross-platform path handling for Windows/Mac/Linux compatibility
+- **RunwayML Model Compatibility**: Different models require different aspect ratios:
+  - Gen-3 Alpha Turbo: `768:1280` (portrait) or `1280:768` (landscape)
+  - Gen-4 Turbo: `720:1280`, `832:1104` (portrait) or `1280:720`, `1584:672`, `1104:832` (landscape) or `960:960` (square)
+  - The system automatically selects the correct ratio based on the model being used
 
 ## Success Criteria
 
@@ -299,6 +303,14 @@ A generated video file must:
     - Fixed video generation service tests to match current model configuration
     - Updated UI tests to match current button text patterns
     - Maintained comprehensive test coverage while fixing implementation details
+
+- **RunwayML Gen-4 Aspect Ratio Compatibility**: Fixed aspect ratio requirements for Gen-4 video generation
+  - **Model-Specific Ratios**: Implemented dynamic aspect ratio selection based on model type
+    - Gen-3 Alpha Turbo: `768:1280` (portrait) for backward compatibility
+    - Gen-4 Turbo: `720:1280` (portrait) for API compliance
+  - **Helper Method**: Added `getPortraitRatioForModel()` to centralize aspect ratio logic
+  - **Backwards Compatibility**: Preserved existing Gen-3 functionality while adding Gen-4 support
+  - **Test Coverage**: All existing tests pass, confirming no regression in video generation pipeline
 
 ### 🚧 Active Development Areas
 - **User Story U3**: Final video generation pipeline integration and testing
