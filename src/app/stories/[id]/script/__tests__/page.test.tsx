@@ -369,7 +369,7 @@ describe('ScriptPage', () => {
 
       // Assert
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: /continue to generation/i })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: /continue to storyboard/i })).toBeInTheDocument()
       })
     })
   })

@@ -76,13 +76,18 @@ export class FFmpegService {
       // Verify caption file was created and log its content
       try {
         const captionContent = await fs.readFile(captionFile, 'utf-8')
-        console.log(`📝 Caption file content (first 300 chars):`)
-        console.log(captionContent.substring(0, 300) + '...')
-        
-        const chunks = this.createCaptionChunks(assets.script.trim())
-        console.log(`📊 Caption chunks (${chunks.length}): ${chunks.slice(0, 5).join(' | ')}${chunks.length > 5 ? '...' : ''}`)
+        if (captionContent) {
+          console.log(`📝 Caption file content (first 300 chars):`)
+          console.log(captionContent.substring(0, 300) + '...')
+          
+          const chunks = this.createCaptionChunks(assets.script.trim())
+          console.log(`📊 Caption chunks (${chunks.length}): ${chunks.slice(0, 5).join(' | ')}${chunks.length > 5 ? '...' : ''}`)
+        }
       } catch (readError) {
-        console.error(`❌ Failed to read caption file: ${readError}`)
+        // Skip logging this error in tests as it's expected when mocking filesystem
+        if (process.env.NODE_ENV !== 'test') {
+          console.error(`❌ Failed to read caption file: ${readError}`)
+        }
       }
 
       // Create output directory
@@ -138,13 +143,17 @@ export class FFmpegService {
         durationSec
       }
     } catch (error) {
-      console.error(`❌ Video assembly failed for story ${storyId}:`, error)
+      if (process.env.NODE_ENV !== 'test') {
+        console.error(`❌ Video assembly failed for story ${storyId}:`, error)
+      }
       
       if (error instanceof FFmpegServiceError) {
         throw error
       }
       
-      console.error('Video assembly failed:', error)
+      if (process.env.NODE_ENV !== 'test') {
+        console.error('Video assembly failed:', error)
+      }
       throw new FFmpegServiceError(
         'Failed to assemble video',
         'ASSEMBLY_FAILED'
@@ -175,7 +184,9 @@ export class FFmpegService {
 
       return data[0] as Video
     } catch (error) {
-      console.error('Failed to create final video:', error)
+      if (process.env.NODE_ENV !== 'test') {
+        console.error('Failed to create final video:', error)
+      }
       throw new FFmpegServiceError(
         'Failed to save video to database',
         'VIDEO_CREATION_FAILED'
@@ -198,7 +209,9 @@ export class FFmpegService {
         try {
           await fs.unlink(assembledFilepath)
         } catch (cleanupError) {
-          console.error('Failed to cleanup video file:', cleanupError)
+          if (process.env.NODE_ENV !== 'test') {
+            console.error('Failed to cleanup video file:', cleanupError)
+          }
         }
       }
 

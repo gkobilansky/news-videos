@@ -87,7 +87,9 @@ export class VideoOrchestrationService {
       return finalVideo
 
     } catch (error) {
-      console.error(`❌ Video generation failed for story ${storyId}:`, error)
+      if (process.env.NODE_ENV !== 'test') {
+        console.error(`❌ Video generation failed for story ${storyId}:`, error)
+      }
 
       // Mark story as failed if we had started processing
       if (story) {
@@ -95,7 +97,9 @@ export class VideoOrchestrationService {
           console.log(`📊 Updating story status to failed...`)
           await storyService.updateStoryStatus(storyId, 'failed')
         } catch (statusError) {
-          console.error('Failed to update story status to failed:', statusError)
+          if (process.env.NODE_ENV !== 'test') {
+            console.error('Failed to update story status to failed:', statusError)
+          }
         }
       }
 
@@ -184,7 +188,9 @@ export class VideoOrchestrationService {
       return finalVideo
 
     } catch (error) {
-      console.error(`❌ Additional video generation failed for story ${storyId}:`, error)
+      if (process.env.NODE_ENV !== 'test') {
+        console.error(`❌ Additional video generation failed for story ${storyId}:`, error)
+      }
 
       if (error instanceof VideoOrchestrationServiceError) {
         throw error

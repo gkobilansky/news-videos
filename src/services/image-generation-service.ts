@@ -74,7 +74,9 @@ export class ImageGenerationService {
           console.log(`✅ Image generated for shot ${shotIndex}: ${path.basename(imageResult.imagePath)}`)
           
         } catch (error: any) {
-          console.error(`❌ Failed to generate image for shot ${shotIndex}:`, error)
+          if (process.env.NODE_ENV !== 'test') {
+            console.error(`❌ Failed to generate image for shot ${shotIndex}:`, error)
+          }
           
           // Continue with other shots even if one fails
           console.warn(`⚠️ Skipping shot ${shotIndex} due to error, continuing with remaining shots...`)
@@ -98,7 +100,9 @@ export class ImageGenerationService {
         throw error
       }
       
-      console.error('❌ Storyboard image generation failed:', error)
+      if (process.env.NODE_ENV !== 'test') {
+        console.error('❌ Storyboard image generation failed:', error)
+      }
       throw new ImageGenerationServiceError(
         `Failed to generate storyboard images: ${error.message || String(error)}`,
         'STORYBOARD_IMAGES_FAILED'
@@ -153,7 +157,9 @@ export class ImageGenerationService {
         throw error
       }
       
-      console.error(`Failed to generate image for shot ${shotIndex}:`, error)
+      if (process.env.NODE_ENV !== 'test') {
+        console.error(`Failed to generate image for shot ${shotIndex}:`, error)
+      }
       throw new ImageGenerationServiceError(
         `Failed to generate image for shot ${shotIndex}: ${error.message || String(error)}`,
         'SHOT_IMAGE_FAILED'
@@ -207,7 +213,9 @@ export class ImageGenerationService {
         throw error
       }
       
-      console.error('Image generation failed:', error)
+      if (process.env.NODE_ENV !== 'test') {
+        console.error('Image generation failed:', error)
+      }
       throw new ImageGenerationServiceError(
         `Failed to generate image: ${error.message || String(error)}`,
         'IMAGE_GENERATION_FAILED'
@@ -301,7 +309,9 @@ export class ImageGenerationService {
 
       return data[0] as Asset
     } catch (error) {
-      console.error('Failed to create image asset:', error)
+      if (process.env.NODE_ENV !== 'test') {
+        console.error('Failed to create image asset:', error)
+      }
       throw new ImageGenerationServiceError(
         'Failed to save image asset to database',
         'ASSET_CREATION_FAILED'
@@ -323,7 +333,9 @@ export class ImageGenerationService {
         .eq('provider', 'runway')
 
       if (error) {
-        console.error('Failed to fetch existing image assets:', error)
+        if (process.env.NODE_ENV !== 'test') {
+          console.error('Failed to fetch existing image assets:', error)
+        }
         return // Don't fail regeneration if cleanup fails
       }
 
@@ -334,7 +346,9 @@ export class ImageGenerationService {
             const fullPath = path.resolve(process.cwd(), asset.filepath)
             await fs.unlink(fullPath)
           } catch (fileError) {
-            console.error(`Failed to delete image file ${asset.filepath}:`, fileError)
+            if (process.env.NODE_ENV !== 'test') {
+              console.error(`Failed to delete image file ${asset.filepath}:`, fileError)
+            }
             // Continue with other files
           }
         }
@@ -348,12 +362,16 @@ export class ImageGenerationService {
           .eq('provider', 'runway')
 
         if (deleteError) {
-          console.error('Failed to delete existing image asset records:', deleteError)
+          if (process.env.NODE_ENV !== 'test') {
+            console.error('Failed to delete existing image asset records:', deleteError)
+          }
           // Don't fail regeneration if cleanup fails
         }
       }
     } catch (error) {
-      console.error('Failed to cleanup existing image assets:', error)
+      if (process.env.NODE_ENV !== 'test') {
+        console.error('Failed to cleanup existing image assets:', error)
+      }
       // Don't fail regeneration if cleanup fails
     }
   }
@@ -382,7 +400,9 @@ export class ImageGenerationService {
         output: task.output
       }
     } catch (error: any) {
-      console.error(`❌ Image generation task failed:`, error)
+      if (process.env.NODE_ENV !== 'test') {
+        console.error(`❌ Image generation task failed:`, error)
+      }
       
       if (error instanceof TaskFailedError) {
         throw new ImageGenerationServiceError(
@@ -398,12 +418,14 @@ export class ImageGenerationService {
       }
       
       // Log the full error for debugging
-      console.error('Full error details:', {
-        message: error.message,
-        status: error.status,
-        error: error.error,
-        headers: error.headers
-      })
+      if (process.env.NODE_ENV !== 'test') {
+        console.error('Full error details:', {
+          message: error.message,
+          status: error.status,
+          error: error.error,
+          headers: error.headers
+        })
+      }
       
       throw new ImageGenerationServiceError(
         `Failed to create image generation task: ${error.message}`,

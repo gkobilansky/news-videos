@@ -121,15 +121,19 @@ export class VideoGenerationService {
         throw error
       }
       
-      console.error('❌ Storyboard video generation failed:', error)
+      if (process.env.NODE_ENV !== 'test') {
+        console.error('❌ Storyboard video generation failed:', error)
+      }
       
       // Log the full error for debugging
-      console.error('Full storyboard error details:', {
-        message: error.message,
-        status: error.status,
-        error: error.error,
-        headers: error.headers
-      })
+      if (process.env.NODE_ENV !== 'test') {
+        console.error('Full storyboard error details:', {
+          message: error.message,
+          status: error.status,
+          error: error.error,
+          headers: error.headers
+        })
+      }
       
       throw new VideoGenerationServiceError(
         `Failed to generate storyboard video: ${error.message || String(error)}`,
@@ -177,7 +181,9 @@ export class VideoGenerationService {
         throw error
       }
       
-      console.error('Video generation failed:', error)
+      if (process.env.NODE_ENV !== 'test') {
+        console.error('Video generation failed:', error)
+      }
       throw new VideoGenerationServiceError(
         'Failed to generate video',
         'VIDEO_GENERATION_FAILED'
@@ -210,7 +216,9 @@ export class VideoGenerationService {
 
       return data[0] as Asset
     } catch (error) {
-      console.error('Failed to create video asset:', error)
+      if (process.env.NODE_ENV !== 'test') {
+        console.error('Failed to create video asset:', error)
+      }
       throw new VideoGenerationServiceError(
         'Failed to save video asset to database',
         'ASSET_CREATION_FAILED'
@@ -233,7 +241,9 @@ export class VideoGenerationService {
         try {
           await fs.unlink(generatedFilepath)
         } catch (cleanupError) {
-          console.error('Failed to cleanup video file:', cleanupError)
+          if (process.env.NODE_ENV !== 'test') {
+            console.error('Failed to cleanup video file:', cleanupError)
+          }
         }
       }
 
@@ -267,7 +277,9 @@ export class VideoGenerationService {
         try {
           await fs.unlink(generatedFilepath)
         } catch (cleanupError) {
-          console.error('Failed to cleanup video file:', cleanupError)
+          if (process.env.NODE_ENV !== 'test') {
+            console.error('Failed to cleanup video file:', cleanupError)
+          }
         }
       }
 
@@ -293,7 +305,9 @@ export class VideoGenerationService {
         .eq('provider', 'runway')
 
       if (error) {
-        console.error('Failed to fetch existing video assets:', error)
+        if (process.env.NODE_ENV !== 'test') {
+          console.error('Failed to fetch existing video assets:', error)
+        }
         return // Don't fail regeneration if cleanup fails
       }
 
@@ -304,7 +318,9 @@ export class VideoGenerationService {
             const fullPath = path.resolve(process.cwd(), asset.filepath)
             await fs.unlink(fullPath)
           } catch (fileError) {
-            console.error(`Failed to delete video file ${asset.filepath}:`, fileError)
+            if (process.env.NODE_ENV !== 'test') {
+              console.error(`Failed to delete video file ${asset.filepath}:`, fileError)
+            }
             // Continue with other files
           }
         }
@@ -318,12 +334,16 @@ export class VideoGenerationService {
           .eq('provider', 'runway')
 
         if (deleteError) {
-          console.error('Failed to delete existing video asset records:', deleteError)
+          if (process.env.NODE_ENV !== 'test') {
+            console.error('Failed to delete existing video asset records:', deleteError)
+          }
           // Don't fail regeneration if cleanup fails
         }
       }
     } catch (error) {
-      console.error('Failed to cleanup existing video assets:', error)
+      if (process.env.NODE_ENV !== 'test') {
+        console.error('Failed to cleanup existing video assets:', error)
+      }
       // Don't fail regeneration if cleanup fails
     }
   }
@@ -349,7 +369,9 @@ export class VideoGenerationService {
         output: task.output
       }
     } catch (error: any) {
-      console.error(`❌ Image generation task failed:`, error)
+      if (process.env.NODE_ENV !== 'test') {
+        console.error(`❌ Image generation task failed:`, error)
+      }
       
       if (error instanceof TaskFailedError) {
         throw new VideoGenerationServiceError(
@@ -365,12 +387,14 @@ export class VideoGenerationService {
       }
       
       // Log the full error for debugging
-      console.error('Full error details:', {
-        message: error.message,
-        status: error.status,
-        error: error.error,
-        headers: error.headers
-      })
+      if (process.env.NODE_ENV !== 'test') {
+        console.error('Full error details:', {
+          message: error.message,
+          status: error.status,
+          error: error.error,
+          headers: error.headers
+        })
+      }
       
       throw new VideoGenerationServiceError(
         `Failed to create image generation task: ${error.message}`,
@@ -417,7 +441,9 @@ export class VideoGenerationService {
         output: task.output // Use the output array directly
       }
     } catch (error: any) {
-      console.error(`❌ Video generation task failed (attempt ${retryCount + 1}/${maxRetries + 1}):`, error)
+      if (process.env.NODE_ENV !== 'test') {
+        console.error(`❌ Video generation task failed (attempt ${retryCount + 1}/${maxRetries + 1}):`, error)
+      }
       
       if (error instanceof TaskFailedError) {
         // Handle Runway ML API errors with retry
@@ -440,12 +466,14 @@ export class VideoGenerationService {
       }
       
       // Log the full error for debugging
-      console.error('Full error details:', {
-        message: error.message,
-        status: error.status,
-        error: error.error,
-        headers: error.headers
-      })
+      if (process.env.NODE_ENV !== 'test') {
+        console.error('Full error details:', {
+          message: error.message,
+          status: error.status,
+          error: error.error,
+          headers: error.headers
+        })
+      }
       
       throw new VideoGenerationServiceError(
         `Failed to create video generation task: ${error.message}`,
@@ -499,16 +527,20 @@ export class VideoGenerationService {
           console.log(`✅ Clip ${shotIndex} completed (${shot.duration}s)`)
           
         } catch (error: any) {
-          console.error(`❌ Failed to generate clip ${shotIndex}:`, error)
+          if (process.env.NODE_ENV !== 'test') {
+            console.error(`❌ Failed to generate clip ${shotIndex}:`, error)
+          }
           
           // Log the full error for debugging
-          console.error(`Full shot ${shotIndex} error details:`, {
-            message: error.message,
-            status: error.status,
-            error: error.error,
-            headers: error.headers,
-            shot: shot
-          })
+          if (process.env.NODE_ENV !== 'test') {
+            console.error(`Full shot ${shotIndex} error details:`, {
+              message: error.message,
+              status: error.status,
+              error: error.error,
+              headers: error.headers,
+              shot: shot
+            })
+          }
           
           throw new VideoGenerationServiceError(
             `Failed to generate clip ${shotIndex}: ${error.message || String(error)}`,
@@ -532,20 +564,24 @@ export class VideoGenerationService {
         throw error
       }
       
-      console.error('❌ Storyboard video generation failed:', error)
+      if (process.env.NODE_ENV !== 'test') {
+        console.error('❌ Storyboard video generation failed:', error)
+      }
       
       // Log the full error for debugging
-      console.error('Full storyboard task error details:', {
-        message: error.message,
-        status: error.status,
-        error: error.error,
-        headers: error.headers,
-        storyboardRequest: {
-          model: storyboardRequest.model,
-          ratio: storyboardRequest.ratio,
-          shotCount: storyboardRequest.shots.length
-        }
-      })
+      if (process.env.NODE_ENV !== 'test') {
+        console.error('Full storyboard task error details:', {
+          message: error.message,
+          status: error.status,
+          error: error.error,
+          headers: error.headers,
+          storyboardRequest: {
+            model: storyboardRequest.model,
+            ratio: storyboardRequest.ratio,
+            shotCount: storyboardRequest.shots.length
+          }
+        })
+      }
       
       throw new VideoGenerationServiceError(
         `Failed to create storyboard video clips: ${error.message || String(error)}`,

@@ -93,18 +93,22 @@ describe('FFmpegService', () => {
 
       const result = await ffmpegService.assembleVideo('story-123', assets)
 
-      expect(mockSpawn).toHaveBeenCalledWith('ffmpeg', expect.arrayContaining([
+      expect(mockSpawn).toHaveBeenNthCalledWith(2, 'ffmpeg', expect.arrayContaining([
         '-i', 'assets/audio/story-123.wav',
         '-i', 'assets/video/story-123.mp4',
         '-vf', expect.stringContaining('subtitles='),
         '-c:v', 'libx264',
         '-c:a', 'aac',
+        '-b:v', '2M',
+        '-b:a', '128k',
+        '-r', '30',
         '-shortest',
-        expect.stringMatching(/output\/story-123\.mp4$/)
+        '-y',
+        expect.stringMatching(/output\/story-123.*\.mp4$/)
       ]))
 
       expect(result).toEqual({
-        filepath: expect.stringMatching(/output\/story-123\.mp4$/),
+        filepath: expect.stringMatching(/output\/story-123.*\.mp4$/),
         durationSec: 15
       })
     })

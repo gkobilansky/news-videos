@@ -176,8 +176,10 @@ Split the script into logical beats and create 2-3 dynamic shots that bring this
         }
         
       } catch (parseError) {
-        console.error('❌ JSON Parse Error:', parseError)
-        console.error('❌ Failed to parse text:', text)
+        if (process.env.NODE_ENV !== 'test') {
+          console.error('❌ JSON Parse Error:', parseError)
+          console.error('❌ Failed to parse text:', text)
+        }
         const errorMessage = parseError instanceof Error ? parseError.message : String(parseError)
         throw new ScriptServiceError(`Invalid JSON response from AI: ${errorMessage}`, 'INVALID_JSON')
       }
