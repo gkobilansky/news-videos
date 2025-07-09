@@ -172,8 +172,9 @@ export function MultiVideoManager({ story, script }: MultiVideoManagerProps) {
                     className="flex-1 px-3 py-2 bg-green-600 text-white text-sm rounded-md hover:bg-green-700 transition-colors"
                     onClick={() => {
                       // Download video logic
+                      const filename = video.filepath.split('/').pop() || video.filepath.split('\\').pop()
                       const link = document.createElement('a')
-                      link.href = video.filepath
+                      link.href = `/api/videos/${filename}`
                       link.download = `story-${story.id}-video-${index + 1}.mp4`
                       link.click()
                     }}
@@ -184,7 +185,8 @@ export function MultiVideoManager({ story, script }: MultiVideoManagerProps) {
                     className="px-3 py-2 bg-gray-600 text-white text-sm rounded-md hover:bg-gray-700 transition-colors"
                     onClick={() => {
                       // Open video in new tab
-                      window.open(video.filepath, '_blank')
+                      const filename = video.filepath.split('/').pop() || video.filepath.split('\\').pop()
+                      window.open(`/api/videos/${filename}`, '_blank')
                     }}
                   >
                     View

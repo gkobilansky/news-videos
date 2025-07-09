@@ -70,7 +70,9 @@ export class TTSService {
         throw error
       }
       
-      console.error('TTS generation failed:', error)
+      if (process.env.NODE_ENV !== 'test') {
+        console.error('TTS generation failed:', error)
+      }
       throw new TTSServiceError(
         'Failed to generate TTS audio',
         'TTS_GENERATION_FAILED'
@@ -103,7 +105,9 @@ export class TTSService {
 
       return data[0] as Asset
     } catch (error) {
-      console.error('Failed to create audio asset:', error)
+      if (process.env.NODE_ENV !== 'test') {
+        console.error('Failed to create audio asset:', error)
+      }
       throw new TTSServiceError(
         'Failed to save audio asset to database',
         'ASSET_CREATION_FAILED'
@@ -133,7 +137,9 @@ export class TTSService {
         try {
           await fs.unlink(generatedFilepath)
         } catch (cleanupError) {
-          console.error('Failed to cleanup audio file:', cleanupError)
+          if (process.env.NODE_ENV !== 'test') {
+            console.error('Failed to cleanup audio file:', cleanupError)
+          }
         }
       }
 
@@ -161,7 +167,9 @@ export class TTSService {
         .limit(1)
 
       if (error) {
-        console.error('Failed to fetch existing audio assets:', error)
+        if (process.env.NODE_ENV !== 'test') {
+          console.error('Failed to fetch existing audio assets:', error)
+        }
         return null
       }
 
@@ -186,7 +194,9 @@ export class TTSService {
         return null
       }
     } catch (error) {
-      console.error('Error checking for existing audio asset:', error)
+      if (process.env.NODE_ENV !== 'test') {
+        console.error('Error checking for existing audio asset:', error)
+      }
       return null
     }
   }

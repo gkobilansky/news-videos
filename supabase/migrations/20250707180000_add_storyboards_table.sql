@@ -3,7 +3,7 @@ CREATE TABLE storyboards (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   story_id UUID NOT NULL REFERENCES stories(id) ON DELETE CASCADE,
   model TEXT NOT NULL CHECK (model IN ('gen4_turbo', 'gen4', 'gen3_alpha_turbo')),
-  ratio TEXT NOT NULL CHECK (ratio IN ('1280:720', '1584:672', '1104:832', '720:1280', '832:1104', '672:1584')),
+  ratio TEXT NOT NULL CHECK (ratio IN ('1280:720', '1584:672', '1104:832', '768:1280', '832:1104', '672:1584')),
   shots JSONB NOT NULL,
   fps INTEGER NOT NULL DEFAULT 24 CHECK (fps IN (24, 30)),
   output_format TEXT NOT NULL DEFAULT 'mp4' CHECK (output_format IN ('mp4', 'gif')),

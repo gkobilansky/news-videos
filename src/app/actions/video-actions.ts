@@ -20,6 +20,22 @@ export async function generateVideoAction(storyId: string): Promise<
   }
 }
 
+export async function generateVideoFromStoryboardAction(storyId: string): Promise<
+  | { success: true; video: Video }
+  | { success: false; error: string }
+> {
+  try {
+    const video = await videoOrchestrationService.generateVideoForStory(storyId)
+    return { success: true, video }
+  } catch (error) {
+    console.error('Storyboard video generation action failed:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to generate video from storyboard'
+    }
+  }
+}
+
 export async function generateAdditionalVideoAction(storyId: string): Promise<
   | { success: true; video: Video }
   | { success: false; error: string }

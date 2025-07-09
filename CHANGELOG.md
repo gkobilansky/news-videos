@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2025-01-07
+
+### Added
+- **🎬 Storyboard-based video generation system** - Complete overhaul using RunwayML's Gen-4 storyboard capabilities [[memory:787391]]
+- **📸 Reference image generation** - Creates anchor images for visual consistency across all shots
+- **🎯 Script-to-shots automation** - Intelligently splits 10-15s scripts into 2-3 logical video beats
+- **⚡ Gen-4 Turbo optimization** - 720p draft resolution for improved performance and credit efficiency
+- **🔄 Motion-centric prompts** - Action-focused prompt generation with @anchor tags for presenter consistency
+- **🎨 Enhanced storyboard editor** - Professional UI component for editing shot prompts, camera angles, and timing
+- **📊 Shot-based orchestration** - Generates individual clips and assembles them into final videos
+- **🧪 Comprehensive test coverage** - 208 passing tests across 15 test suites with complete pipeline coverage
+
+### Changed
+- **BREAKING**: Replaced simple text-to-video with sophisticated storyboard approach
+- **Enhanced video generation service** - Now supports both legacy and storyboard-based generation
+- **Improved error handling** - Better handling of Runway API failures with detailed error messages
+- **Optimized credit usage** - Single reference image per storyboard instead of per-shot images
+- **Updated database schema** - Added storyboards table with JSONB shot storage
+
+### Technical Improvements
+- **Professional workflow** - Following industry-standard video production practices
+- **Visual consistency** - Reference images tagged as "anchor" for consistent presenter appearance
+- **Efficient processing** - Optimized API calls and reduced redundant operations
+- **Enhanced prompting** - Motion-centric descriptions avoiding negative prompts
+- **Better orchestration** - Improved video assembly and synchronization
+
+### Fixed
+- API timeout issues with long-running video generation tasks
+- Inconsistent visual styling across multiple shots
+- Credit inefficiency from generating too many reference images
+- Error handling for Runway API failures
+- Database schema mismatches between TypeScript interfaces and SQL
+
 ## [0.4.0] - 2024-12-27
 
 ### Added

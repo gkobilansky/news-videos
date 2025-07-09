@@ -119,7 +119,7 @@ tools: {
 // Storyboard request structure
 const storyboardRequest = {
   model: 'gen4_turbo',
-  ratio: '720:1280', // Portrait for vertical videos
+  ratio: '768:1280', // Portrait for vertical videos
   shots: [
     {
       promptText: 'Wide establishing shot of news scene, cinematic lighting',

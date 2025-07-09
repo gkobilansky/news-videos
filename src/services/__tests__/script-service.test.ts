@@ -140,25 +140,236 @@ describe('ScriptService', () => {
   })
 
   describe('prompt building', () => {
-    it('should build script prompt correctly', () => {
+    it('should build script prompt with story context', () => {
       const buildMethod = (scriptService as any).buildScriptPrompt.bind(scriptService)
       
       const prompt = buildMethod(mockStory)
       
-      expect(prompt).toContain('45 words maximum')
-      expect(prompt).toContain(mockStory.headline)
-      expect(prompt).toContain('Sources:')
+      expect(prompt).toContain('Test Headline')
+      expect(prompt).toContain('Test hot take')
+      expect(prompt).toContain('https://example.com/source1')
+      expect(prompt).toContain('50 words')
+      expect(prompt).toContain('Engaging')
+      expect(prompt).toContain('script')
+    })
+  })
+
+  describe('manual shot creation', () => {
+    it('should add a new shot to existing storyboard', async () => {
+      const mockSupabase = require('../../lib/supabase').supabaseAdmin
+      const newShot = {
+        promptText: 'New manually created shot',
+        duration: 10 as const,
+        camera: { movement: 'pan-left' as const, angle: 'high-angle' as const }
+      }
+      
+      // Mock successful database response for getting storyboard
+      mockSupabase.from.mockReturnValue({
+        select: jest.fn().mockReturnValue({
+          eq: jest.fn().mockReturnValue({
+            single: jest.fn().mockResolvedValue({
+              data: mockStoryboard,
+              error: null
+            })
+          })
+        }),
+        update: jest.fn().mockReturnValue({
+          eq: jest.fn().mockReturnValue({
+            select: jest.fn().mockReturnValue({
+              single: jest.fn().mockResolvedValue({
+                data: {
+                  ...mockStoryboard,
+                  shots: [...mockStoryboard.shots, newShot]
+                },
+                error: null
+              })
+            })
+          })
+        })
+      })
+
+      const result = await scriptService.addShotToStoryboard(mockStory.id, newShot)
+      
+      expect(result).toBeDefined()
+      expect(result.shots).toHaveLength(4)
+      expect(result.shots[3]).toEqual(newShot)
     })
 
-    it('should build storyboard prompt correctly', () => {
-      const buildMethod = (scriptService as any).buildStoryboardPrompt.bind(scriptService)
+    it('should insert a shot at specific position', async () => {
+      const mockSupabase = require('../../lib/supabase').supabaseAdmin
+      const newShot = {
+        promptText: 'Inserted shot',
+        duration: 16 as const,
+        camera: { movement: 'dolly-out' as const, angle: 'bird-eye' as const }
+      }
       
-      const prompt = buildMethod(mockStory, [])
+      const expectedShots = [
+        mockStoryboard.shots[0],
+        newShot,
+        mockStoryboard.shots[1],
+        mockStoryboard.shots[2]
+      ]
       
-      expect(prompt).toContain('3-shot storyboard')
-      expect(prompt).toContain('720:1280')
-      expect(prompt).toContain(mockStory.headline)
-      expect(prompt).toContain('JSON')
+      // Mock successful database response
+      mockSupabase.from.mockReturnValue({
+        select: jest.fn().mockReturnValue({
+          eq: jest.fn().mockReturnValue({
+            single: jest.fn().mockResolvedValue({
+              data: mockStoryboard,
+              error: null
+            })
+          })
+        }),
+        update: jest.fn().mockReturnValue({
+          eq: jest.fn().mockReturnValue({
+            select: jest.fn().mockReturnValue({
+              single: jest.fn().mockResolvedValue({
+                data: {
+                  ...mockStoryboard,
+                  shots: expectedShots
+                },
+                error: null
+              })
+            })
+          })
+        })
+      })
+
+      const result = await scriptService.insertShotAtPosition(mockStory.id, 1, newShot)
+      
+      expect(result).toBeDefined()
+      expect(result.shots).toHaveLength(4)
+      expect(result.shots[1]).toEqual(newShot)
+    })
+
+    it('should remove a shot from storyboard', async () => {
+      const mockSupabase = require('../../lib/supabase').supabaseAdmin
+      
+      const expectedShots = [
+        mockStoryboard.shots[0],
+        mockStoryboard.shots[2]
+      ]
+      
+      // Mock successful database response
+      mockSupabase.from.mockReturnValue({
+        select: jest.fn().mockReturnValue({
+          eq: jest.fn().mockReturnValue({
+            single: jest.fn().mockResolvedValue({
+              data: mockStoryboard,
+              error: null
+            })
+          })
+        }),
+        update: jest.fn().mockReturnValue({
+          eq: jest.fn().mockReturnValue({
+            select: jest.fn().mockReturnValue({
+              single: jest.fn().mockResolvedValue({
+                data: {
+                  ...mockStoryboard,
+                  shots: expectedShots
+                },
+                error: null
+              })
+            })
+          })
+        })
+      })
+
+      const result = await scriptService.removeShotFromStoryboard(mockStory.id, 1)
+      
+      expect(result).toBeDefined()
+      expect(result.shots).toHaveLength(2)
+      expect(result.shots[0]).toEqual(mockStoryboard.shots[0])
+      expect(result.shots[1]).toEqual(mockStoryboard.shots[2])
+    })
+
+    it('should validate shot data before adding', async () => {
+      const invalidShot = {
+        promptText: '',
+        duration: 7 as any, // Invalid duration
+        camera: { movement: 'invalid' as any, angle: 'eye-level' as const }
+      }
+
+      await expect(scriptService.addShotToStoryboard(mockStory.id, invalidShot))
+        .rejects
+        .toThrow('Invalid shot data')
+    })
+
+    it('should handle errors when storyboard not found', async () => {
+      const mockSupabase = require('../../lib/supabase').supabaseAdmin
+      
+      mockSupabase.from.mockReturnValue({
+        select: jest.fn().mockReturnValue({
+          eq: jest.fn().mockReturnValue({
+            single: jest.fn().mockResolvedValue({
+              data: null,
+              error: { code: 'PGRST116' }
+            })
+          })
+        })
+      })
+
+      const newShot = {
+        promptText: 'New shot',
+        duration: 5 as const,
+        camera: { movement: 'static' as const, angle: 'eye-level' as const }
+      }
+
+      await expect(scriptService.addShotToStoryboard(mockStory.id, newShot))
+        .rejects
+        .toThrow('Storyboard not found')
+    })
+
+    it('should validate position bounds when inserting', async () => {
+      const mockSupabase = require('../../lib/supabase').supabaseAdmin
+      
+      mockSupabase.from.mockReturnValue({
+        select: jest.fn().mockReturnValue({
+          eq: jest.fn().mockReturnValue({
+            single: jest.fn().mockResolvedValue({
+              data: mockStoryboard,
+              error: null
+            })
+          })
+        })
+      })
+
+      const newShot = {
+        promptText: 'New shot',
+        duration: 5 as const,
+        camera: { movement: 'static' as const, angle: 'eye-level' as const }
+      }
+
+      await expect(scriptService.insertShotAtPosition(mockStory.id, -1, newShot))
+        .rejects
+        .toThrow('Invalid position')
+
+      await expect(scriptService.insertShotAtPosition(mockStory.id, 10, newShot))
+        .rejects
+        .toThrow('Invalid position')
+    })
+
+    it('should validate position bounds when removing', async () => {
+      const mockSupabase = require('../../lib/supabase').supabaseAdmin
+      
+      mockSupabase.from.mockReturnValue({
+        select: jest.fn().mockReturnValue({
+          eq: jest.fn().mockReturnValue({
+            single: jest.fn().mockResolvedValue({
+              data: mockStoryboard,
+              error: null
+            })
+          })
+        })
+      })
+
+      await expect(scriptService.removeShotFromStoryboard(mockStory.id, -1))
+        .rejects
+        .toThrow('Invalid position')
+
+      await expect(scriptService.removeShotFromStoryboard(mockStory.id, 10))
+        .rejects
+        .toThrow('Invalid position')
     })
   })
 })

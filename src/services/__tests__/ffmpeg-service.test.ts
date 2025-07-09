@@ -93,18 +93,22 @@ describe('FFmpegService', () => {
 
       const result = await ffmpegService.assembleVideo('story-123', assets)
 
-      expect(mockSpawn).toHaveBeenCalledWith('ffmpeg', expect.arrayContaining([
+      expect(mockSpawn).toHaveBeenNthCalledWith(2, 'ffmpeg', expect.arrayContaining([
         '-i', 'assets/audio/story-123.wav',
         '-i', 'assets/video/story-123.mp4',
         '-vf', expect.stringContaining('subtitles='),
         '-c:v', 'libx264',
         '-c:a', 'aac',
+        '-b:v', '2M',
+        '-b:a', '128k',
+        '-r', '30',
         '-shortest',
-        expect.stringMatching(/output\/story-123\.mp4$/)
+        '-y',
+        expect.stringMatching(/output\/story-123.*\.mp4$/)
       ]))
 
       expect(result).toEqual({
-        filepath: expect.stringMatching(/output\/story-123\.mp4$/),
+        filepath: expect.stringMatching(/output\/story-123.*\.mp4$/),
         durationSec: 15
       })
     })
@@ -313,70 +317,6 @@ describe('FFmpegService', () => {
     })
   })
 
-  describe('assembleVideoForStory', () => {
-    it('should orchestrate complete video assembly process', async () => {
-      // Mock assembleVideo
-      const mockAssembleVideo = jest.spyOn(ffmpegService, 'assembleVideo')
-        .mockResolvedValue({
-          filepath: 'output/story-123.mp4',
-          durationSec: 15
-        })
-
-      // Mock createFinalVideo
-      const mockCreateFinalVideo = jest.spyOn(ffmpegService, 'createFinalVideo')
-        .mockResolvedValue(createMockVideo({
-          id: 'video-123',
-          story_id: 'story-123',
-          filepath: 'output/story-123.mp4',
-          duration_sec: 15
-        }))
-
-      const assets = {
-        audioFilepath: 'assets/audio/story-123.wav',
-        videoFilepath: 'assets/video/story-123.mp4',
-        script: 'Test news script for video assembly'
-      }
-
-      const result = await ffmpegService.assembleVideoForStory('story-123', assets)
-
-      expect(mockAssembleVideo).toHaveBeenCalledWith('story-123', assets)
-      expect(mockCreateFinalVideo).toHaveBeenCalledWith(
-        'story-123',
-        'output/story-123.mp4',
-        15
-      )
-
-      expect(result.story_id).toBe('story-123')
-      expect(result.filepath).toBe('output/story-123.mp4')
-      expect(result.duration_sec).toBe(15)
-    })
-
-    it('should clean up files if database creation fails', async () => {
-      const mockAssembleVideo = jest.spyOn(ffmpegService, 'assembleVideo')
-        .mockResolvedValue({
-          filepath: 'output/story-123.mp4',
-          durationSec: 15
-        })
-
-      const mockCreateFinalVideo = jest.spyOn(ffmpegService, 'createFinalVideo')
-        .mockRejectedValue(new Error('Database error'))
-
-      mockFs.unlink = jest.fn().mockResolvedValue(undefined)
-
-      const assets = {
-        audioFilepath: 'assets/audio/story-123.wav',
-        videoFilepath: 'assets/video/story-123.mp4',
-        script: 'Test script'
-      }
-
-      await expect(
-        ffmpegService.assembleVideoForStory('story-123', assets)
-      ).rejects.toThrow(FFmpegServiceError)
-
-      expect(mockFs.unlink).toHaveBeenCalledWith('output/story-123.mp4')
-    })
-  })
-
   describe('generateCaptionFile', () => {
     it('should generate synchronized SRT subtitle file with chunked captions', async () => {
       mockFs.writeFile.mockResolvedValue(undefined)
@@ -397,16 +337,22 @@ describe('FFmpegService', () => {
       // Get the written SRT content
       const writtenContent = mockFs.writeFile.mock.calls[0][1] as string
 
-      // Should have multiple SRT entries (script is broken into 4-word chunks)
-      // With 3 chunks over 8 seconds: 8000ms / 3 = 2667ms per chunk
-      expect(writtenContent).toMatch(/1\n00:00:00,000 --> 00:00:02,667\nThis is a test\n\n/)
-      expect(writtenContent).toMatch(/2\n00:00:02,667 --> 00:00:05,333\nscript with multiple words\n\n/)
-      expect(writtenContent).toMatch(/3\n00:00:05,333 --> 00:00:08,000\nfor subtitle generation\.\n\n/)
+      // Should have multiple SRT entries (script is broken into 2-3 word chunks)
+      // With 6 chunks over 8 seconds: 8000ms / 6 = 1333ms per chunk
+      expect(writtenContent).toMatch(/1\n00:00:00,000 --> 00:00:01,333\nThis is\n\n/)
+      expect(writtenContent).toMatch(/2\n00:00:01,333 --> 00:00:02,667\na test\n\n/)
+      expect(writtenContent).toMatch(/3\n00:00:02,667 --> 00:00:04,000\nscript with\n\n/)
+      expect(writtenContent).toMatch(/4\n00:00:04,000 --> 00:00:05,333\nmultiple words\n\n/)
+      expect(writtenContent).toMatch(/5\n00:00:05,333 --> 00:00:06,667\nfor subtitle\n\n/)
+      expect(writtenContent).toMatch(/6\n00:00:06,667 --> 00:00:08,000\ngeneration\.\n\n/)
 
       // Should contain proper timing distribution across 8 seconds
-      expect(writtenContent).toContain('00:00:00,000 --> 00:00:02,667')
-      expect(writtenContent).toContain('00:00:02,667 --> 00:00:05,333')
-      expect(writtenContent).toContain('00:00:05,333 --> 00:00:08,000')
+      expect(writtenContent).toContain('00:00:00,000 --> 00:00:01,333')
+      expect(writtenContent).toContain('00:00:01,333 --> 00:00:02,667')
+      expect(writtenContent).toContain('00:00:02,667 --> 00:00:04,000')
+      expect(writtenContent).toContain('00:00:04,000 --> 00:00:05,333')
+      expect(writtenContent).toContain('00:00:05,333 --> 00:00:06,667')
+      expect(writtenContent).toContain('00:00:06,667 --> 00:00:08,000')
 
       // Should not contain the entire script as a single caption
       expect(writtenContent).not.toMatch(/00:00:00,000 --> 00:00:08,000.*This is a test script with multiple words for subtitle generation\./)
@@ -427,32 +373,37 @@ describe('FFmpegService', () => {
 
       const writtenContent = mockFs.writeFile.mock.calls[0][1] as string
 
-      // Should have single entry for short script (3 words)
-      expect(writtenContent).toMatch(/1\n00:00:00,000 --> 00:00:03,000\nShort script here\n\n/)
-      expect(writtenContent).not.toContain('2\n')
+      // Should have 2 entries for short script (3 words split as "Short script" and "here")
+      expect(writtenContent).toMatch(/1\n00:00:00,000 --> 00:00:01,500\nShort script\n\n/)
+      expect(writtenContent).toMatch(/2\n00:00:01,500 --> 00:00:03,000\nhere\n\n/)
+      expect(writtenContent).toContain('2\n') // Should have 2 entries
     })
   })
 
   describe('createCaptionChunks', () => {
-    it('should break script into 4-word chunks', () => {
+    it('should break script into 2-3 word chunks intelligently', () => {
       const script = 'This is a longer test script with multiple words for testing chunk creation'
       const chunks = (ffmpegService as any).createCaptionChunks(script)
 
       expect(chunks).toEqual([
-        'This is a longer',
-        'test script with multiple',
-        'words for testing chunk',
+        'This is',
+        'a longer',
+        'test script',
+        'with multiple',
+        'words for',
+        'testing chunk',
         'creation'
       ])
     })
 
-    it('should handle scripts with exact multiple of 4 words', () => {
-      const script = 'One two three four five six seven eight'
+    it('should handle scripts with natural word groupings', () => {
+      const script = 'Breaking news today major announcement expected'
       const chunks = (ffmpegService as any).createCaptionChunks(script)
 
       expect(chunks).toEqual([
-        'One two three four',
-        'five six seven eight'
+        'Breaking news',
+        'today major',
+        'announcement expected'
       ])
     })
 
@@ -461,6 +412,13 @@ describe('FFmpegService', () => {
       const chunks = (ffmpegService as any).createCaptionChunks(script)
 
       expect(chunks).toEqual(['One two'])
+    })
+
+    it('should handle single word scripts', () => {
+      const script = 'Emergency'
+      const chunks = (ffmpegService as any).createCaptionChunks(script)
+
+      expect(chunks).toEqual(['Emergency'])
     })
   })
 
@@ -575,8 +533,8 @@ describe('FFmpegService', () => {
       const filterComplex = command[filterComplexIndex + 1]
       
       // Should contain valid trim filters with duration
-      expect(filterComplex).toMatch(/\[1:v\]trim=duration=\d+,scale=720:1280,setsar=1\[v0\]/)
-      expect(filterComplex).toMatch(/\[2:v\]trim=duration=\d+,scale=720:1280,setsar=1\[v1\]/)
+      expect(filterComplex).toMatch(/\[1:v\]trim=duration=\d+,scale=768:1280,setsar=1\[v0\]/)
+      expect(filterComplex).toMatch(/\[2:v\]trim=duration=\d+,scale=768:1280,setsar=1\[v1\]/)
       
       // Should contain concatenation filter
       expect(filterComplex).toMatch(/\[v0\]\[v1\]concat=n=2:v=1:a=0\[concat\]/)

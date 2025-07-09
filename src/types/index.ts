@@ -44,7 +44,7 @@ export interface Storyboard {
   id: string
   story_id: string
   model: 'gen4_turbo' | 'gen4' | 'gen3_alpha_turbo'
-  ratio: '1280:720' | '1584:672' | '1104:832' | '720:1280' | '832:1104' | '672:1584' // Landscape and portrait options
+  ratio: '1280:720' | '1584:672' | '1104:832' | '768:1280' | '832:1104' | '672:1584' // Landscape and portrait options
   shots: StoryboardShot[]
   fps: 24 | 30
   output_format: 'mp4' | 'gif'

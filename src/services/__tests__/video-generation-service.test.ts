@@ -114,16 +114,17 @@ describe('VideoGenerationService', () => {
       })
 
       expect(mockRunway.imageToVideo.create).toHaveBeenCalledWith({
-        model: 'gen3a_turbo',
+        model: 'gen4_turbo',
         promptText: 'A futuristic cityscape with flying cars and neon lights',
         promptImage: 'https://runway.ai/image/output-123.jpg',
         duration: 10,
-        ratio: '768:1280'
+        ratio: '720:1280'
       })
 
       expect(result).toEqual({
-        filepath: expect.stringMatching(/assets\/video\/story-123-runway\.mp4$/),
-        durationSec: 10
+        videoPath: expect.stringMatching(/assets\/video\/story-123-runway\.mp4$/),
+        allClips: [expect.stringMatching(/assets\/video\/story-123-runway\.mp4$/)],
+        duration: 10
       })
     })
 
@@ -337,8 +338,9 @@ describe('VideoGenerationService', () => {
       // Mock generateVideo
       const mockGenerateVideo = jest.spyOn(videoService, 'generateVideo')
         .mockResolvedValue({
-          filepath: 'assets/video/story-123.mp4',
-          durationSec: 10
+          videoPath: 'assets/video/story-123.mp4',
+          allClips: ['assets/video/story-123.mp4'],
+          duration: 10
         })
 
       // Mock createVideoAsset
@@ -375,8 +377,9 @@ describe('VideoGenerationService', () => {
     it('should clean up files if asset creation fails', async () => {
       const mockGenerateVideo = jest.spyOn(videoService, 'generateVideo')
         .mockResolvedValue({
-          filepath: 'assets/video/story-123.mp4',
-          durationSec: 10
+          videoPath: 'assets/video/story-123.mp4',
+          allClips: ['assets/video/story-123.mp4'],
+          duration: 10
         })
 
       const mockCreateAsset = jest.spyOn(videoService, 'createVideoAsset')
@@ -401,8 +404,9 @@ describe('VideoGenerationService', () => {
       // Mock generateVideo
       const mockGenerateVideo = jest.spyOn(videoService, 'generateVideo')
         .mockResolvedValue({
-          filepath: 'assets/video/story-123-take2.mp4',
-          durationSec: 10
+          videoPath: 'assets/video/story-123-take2.mp4',
+          allClips: ['assets/video/story-123-take2.mp4'],
+          duration: 10
         })
 
       // Mock createVideoAsset
@@ -447,8 +451,9 @@ describe('VideoGenerationService', () => {
       // Mock generateVideo
       const mockGenerateVideo = jest.spyOn(videoService, 'generateVideo')
         .mockResolvedValue({
-          filepath: 'assets/video/story-123.mp4',
-          durationSec: 10
+          videoPath: 'assets/video/story-123.mp4',
+          allClips: ['assets/video/story-123.mp4'],
+          duration: 10
         })
 
       // Mock createVideoAsset to fail
@@ -466,5 +471,171 @@ describe('VideoGenerationService', () => {
     })
   })
 
-  // Note: pollTaskStatus tests removed since we now use waitForTaskOutput() from Runway SDK
+  describe('generateVideoFromStoryboard', () => {
+    it('should generate individual video clips using existing reference images', async () => {
+      const mockStoryboard = {
+        model: 'gen4_turbo',
+        ratio: '768:1280',
+        shots: [
+          {
+            promptText: 'Wide establishing shot of tech conference, cinematic lighting',
+            duration: 5,
+            camera: { movement: 'static', angle: 'eye-level' }
+          },
+          {
+            promptText: 'Close-up handheld shot of excited scientist, dramatic',
+            duration: 5,
+            camera: { movement: 'handheld', angle: 'low-angle' }
+          },
+          {
+            promptText: 'Dolly-in final shot showing breakthrough technology, warm tones',
+            duration: 5,
+            camera: { movement: 'dolly-in', angle: 'low-angle' }
+          }
+        ]
+      }
+
+      // Mock existing image assets from database
+      const mockExistingImages = [
+        createMockAsset({
+          id: 'asset-1',
+          story_id: 'story123',
+          kind: 'image',
+          provider: 'runway',
+          filepath: 'assets/images/story123-shot1.jpg',
+          metadata: { shotIndex: 1 }
+        }),
+        createMockAsset({
+          id: 'asset-2',
+          story_id: 'story123',
+          kind: 'image',
+          provider: 'runway',
+          filepath: 'assets/images/story123-shot2.jpg',
+          metadata: { shotIndex: 2 }
+        }),
+        createMockAsset({
+          id: 'asset-3',
+          story_id: 'story123',
+          kind: 'image',
+          provider: 'runway',
+          filepath: 'assets/images/story123-shot3.jpg',
+          metadata: { shotIndex: 3 }
+        })
+      ]
+
+      // Mock getExistingImageAssets to return the existing images
+      ;(videoService as any).getExistingImageAssets = jest.fn().mockResolvedValue(mockExistingImages)
+
+      // Mock the createVideoFromImageTask to return different videos for each shot
+      const mockVideoOutputs = [
+        ['https://example.com/shot1-video.mp4'],
+        ['https://example.com/shot2-video.mp4'],
+        ['https://example.com/shot3-video.mp4']
+      ]
+      
+      let videoCallCount = 0
+      ;(videoService as any).createVideoFromImageTask = jest.fn().mockImplementation(() => {
+        const output = mockVideoOutputs[videoCallCount]
+        videoCallCount++
+        return Promise.resolve({
+          id: `video-task-${videoCallCount}`,
+          status: 'completed',
+          output
+        })
+      })
+
+      // Mock the downloadVideo method to return local file paths
+      const mockDownloadedPaths = [
+        '/path/to/story123-storyboard-shot1.mp4',
+        '/path/to/story123-storyboard-shot2.mp4',
+        '/path/to/story123-storyboard-shot3.mp4'
+      ]
+      
+      let downloadCallCount = 0
+      ;(videoService as any).downloadVideo = jest.fn().mockImplementation(() => {
+        const path = mockDownloadedPaths[downloadCallCount]
+        downloadCallCount++
+        return Promise.resolve(path)
+      })
+
+      const result = await videoService.generateVideoFromStoryboard('story123', mockStoryboard)
+
+      expect(result).toEqual({
+        videoPath: '/path/to/story123-storyboard-shot1.mp4', // First clip as main
+        allClips: [
+          '/path/to/story123-storyboard-shot1.mp4',
+          '/path/to/story123-storyboard-shot2.mp4',
+          '/path/to/story123-storyboard-shot3.mp4'
+        ],
+        duration: 15 // 5 + 5 + 5 seconds
+      })
+
+      // Verify existing images were retrieved
+      expect((videoService as any).getExistingImageAssets).toHaveBeenCalledWith('story123')
+      
+      // Verify videos were generated from existing images (no new image generation)
+      expect((videoService as any).createVideoFromImageTask).toHaveBeenCalledTimes(3) // 3 shots
+      expect((videoService as any).downloadVideo).toHaveBeenCalledTimes(3) // 3 clips
+      
+      // Verify each shot was processed with existing local image paths
+      expect((videoService as any).createVideoFromImageTask).toHaveBeenNthCalledWith(
+        1,
+        expect.stringContaining('story123-shot1.jpg'), // Uses existing local path
+        'Wide establishing shot of tech conference, cinematic lighting'
+      )
+      expect((videoService as any).createVideoFromImageTask).toHaveBeenNthCalledWith(
+        2,
+        expect.stringContaining('story123-shot2.jpg'),
+        'Close-up handheld shot of excited scientist, dramatic'
+      )
+      expect((videoService as any).createVideoFromImageTask).toHaveBeenNthCalledWith(
+        3,
+        expect.stringContaining('story123-shot3.jpg'),
+        'Dolly-in final shot showing breakthrough technology, warm tones'
+      )
+    })
+
+    it('should throw error when no reference images exist', async () => {
+      const mockStoryboard = {
+        model: 'gen4_turbo',
+        ratio: '768:1280',
+        shots: [
+          {
+            promptText: 'Single shot test',
+            duration: 5
+          }
+        ]
+      }
+
+      // Mock getExistingImageAssets to return empty array (no existing images)
+      ;(videoService as any).getExistingImageAssets = jest.fn().mockResolvedValue([])
+
+      await expect(
+        videoService.generateVideoFromStoryboard('story123', mockStoryboard)
+      ).rejects.toThrow('No reference images found for story. Please generate storyboard images first.')
+
+      // Should check for existing images first
+      expect((videoService as any).getExistingImageAssets).toHaveBeenCalledWith('story123')
+    })
+
+    it('should throw error for invalid storyboard', async () => {
+      await expect(
+        videoService.generateVideoFromStoryboard('story123', null)
+      ).rejects.toThrow('Valid storyboard is required')
+
+      await expect(
+        videoService.generateVideoFromStoryboard('story123', { shots: [] })
+      ).rejects.toThrow('Valid storyboard is required')
+    })
+
+    it('should throw error for missing story ID', async () => {
+      const mockStoryboard = {
+        shots: [{ promptText: 'Test shot', duration: 5 }]
+      }
+
+      await expect(
+        videoService.generateVideoFromStoryboard('', mockStoryboard)
+      ).rejects.toThrow('Story ID is required')
+    })
+  })
 })

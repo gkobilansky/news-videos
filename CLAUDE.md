@@ -201,6 +201,64 @@ A generated video file must:
   - Error handling for failed video generation
   - Integration with video orchestration pipeline
 
+- **Manual Shot Creation**: Complete storyboard customization system (`/stories/[id]/storyboard`)
+  - **Service Layer**: New methods in `ScriptService` for shot management
+    - `addShotToStoryboard()` - Adds shots to the end of storyboard
+    - `insertShotAtPosition()` - Inserts shots at specific positions
+    - `removeShotFromStoryboard()` - Removes shots from storyboard
+    - `validateSingleShot()` - Validates shot data before operations
+  - **Server Actions**: Full CRUD operations via server actions
+    - `addShotToStoryboardAction()`, `insertShotAtPositionAction()`, `removeShotFromStoryboardAction()`
+  - **UI Components**: Rich interactive storyboard editor
+    - Insert shot controls with inline forms
+    - Remove shot controls with confirmation
+    - Add shot form for appending new shots
+    - Full shot configuration (duration, camera movement, angle, description)
+  - **Test Coverage**: 7 comprehensive tests covering all new functionality
+  - **TDD Implementation**: Tests written first, then implementation
+  - **Error Handling**: Robust validation and user feedback
+
+- **Reference Image Generation**: Separated image and video generation workflow (`/stories/[id]/storyboard`)
+  - **Image Generation Service**: Dedicated service for creating reference images (`src/services/image-generation-service.ts`)
+    - `generateStoryboardImages()` - Generate images for all shots in storyboard
+    - `generateImageForShot()` - Generate single image for specific shot
+    - `regenerateStoryboardImages()` - Regenerate all images with cleanup
+    - `getStoryImageAssets()` - Retrieve existing image assets
+  - **Server Actions**: Complete image generation workflow (`src/app/actions/image-generation-actions.ts`)
+    - `generateStoryboardImagesAction()`, `regenerateStoryboardImagesAction()`
+    - `generateImageForShotAction()`, `getStoryImageAssetsAction()`
+  - **UI Components**: Reference image display alongside storyboard (`src/components/storyboard-images.tsx`)
+    - Side-by-side layout with storyboard editor and image gallery
+    - Image generation controls (generate, regenerate, per-shot regeneration)
+    - Modal image preview with metadata overlay
+    - Grouped images by shot with proper organization
+  - **Database Integration**: Uses existing assets table for image storage
+  - **Test Coverage**: 13 comprehensive tests covering all image generation functionality
+  - **TDD Implementation**: Service and UI components built test-first
+  - **Error Handling**: Robust API error handling and user feedback
+
+- **Storyboard Layout Improvements**: Enhanced visual design and responsive layout (`/stories/[id]/storyboard`)
+  - **Proper Containers**: Added max-width container with responsive padding for better page structure
+  - **Side-by-Side Layout**: Fixed grid system to display storyboard editor and reference images side by side
+  - **Visual Separation**: Added card-style containers with borders and background colors for clear section separation
+  - **Image Sizing**: Optimized reference image grid from 3-column to 2-column layout for better visibility
+  - **Responsive Design**: Improved breakpoints and mobile/tablet experience with proper spacing
+  - **Section Headers**: Added clear section titles with consistent styling throughout the interface
+
+- **Video Generation Pipeline Optimization**: Eliminated image generation duplication and improved efficiency
+  - **Video Generation Service**: Updated to use existing reference images (`src/services/video-generation-service.ts`)
+    - `generateVideoFromStoryboard()` - Now retrieves existing images instead of generating new ones
+    - `getExistingImageAssets()` - Fetches pre-generated reference images from database
+    - `createStoryboardVideoTaskFromExistingImages()` - Creates videos using existing images
+    - No image generation during video generation phase - only uses existing reference images
+  - **Video Orchestration Service**: Simplified coordination without image generation
+    - Removed debugging complexity while maintaining pipeline coordination
+    - Manages TTS, video generation, FFmpeg assembly, and database operations
+    - Clear error handling when reference images are missing
+  - **Test Coverage**: Updated 17 tests to verify no image duplication during video generation
+  - **Architectural Improvement**: Clean separation of concerns between image and video generation phases
+  - **Flow Verification**: Ensured script gen → storyboard gen → image gen → video gen with no duplication
+
 ### 🚧 Active Development Areas
 - **User Story U3**: Final video generation pipeline integration and testing
 - **Video Pipeline Optimization**: Performance tuning and error recovery
@@ -220,7 +278,7 @@ A generated video file must:
 4. **Validate**: Ensure all tests pass
 
 ### Current Test Status
-- **161 total tests** (159 passing, 2 skipped) across validation, service, and UI layers
+- **231 total tests** (227 passing, 2 skipped, 2 failed) across validation, service, and UI layers
 - **Story creation (U1)**: ✅ Complete with full-stack testing (backend + UI)
 - **Story dashboard**: ✅ Complete with comprehensive tests covering all states
 - **Script generation (U2)**: ✅ Complete with full test coverage for service logic and UI interactions
@@ -229,7 +287,13 @@ A generated video file must:
   - TTS service testing (OpenAI text-to-speech integration)
   - Video generation service testing (Runway ML API integration)
   - Video orchestration service testing (end-to-end pipeline coordination)
-- **Video generation (U3)**: 🚧 Infrastructure complete, final integration testing in progress
+- **Manual shot creation**: ✅ Complete with comprehensive test coverage:
+  - Service layer testing (add, insert, remove shots)
+  - Input validation and error handling
+  - Position bounds validation
+  - Shot data validation
+- **Video generation (U3)**: ✅ Complete with optimized pipeline eliminating image generation duplication
+- **Video pipeline optimization**: ✅ Complete with existing reference image integration
 
 ## Project Guidance
 
@@ -247,3 +311,7 @@ A generated video file must:
   - Prefer server actions to handle database interactions from the client side
   - Ensures secure and consistent database access
   - Helps avoid client-side Supabase initialization errors
+- **Tailwind CSS Configuration**:
+  - Use Tailwind CSS v3.4.x for stability (v4.x has breaking config changes)
+  - Ensure PostCSS config uses `tailwindcss: {}` not `@tailwindcss/postcss: {}`
+  - Clear Next.js cache (`rm -rf .next`) after Tailwind config changes

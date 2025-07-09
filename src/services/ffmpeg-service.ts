@@ -45,25 +45,59 @@ export class FFmpegService {
       throw new FFmpegServiceError('Script is required', 'INVALID_SCRIPT')
     }
 
+    console.log(`🎬 Starting video assembly for story ${storyId}`)
+    console.log(`📄 Script: "${assets.script}"`)
+
     try {
       // Verify input files exist
       const videoFiles = Array.isArray(assets.videoFilepath) ? assets.videoFilepath : [assets.videoFilepath]
+      console.log(`🔍 Verifying input files:`)
+      console.log(`  Audio: ${assets.audioFilepath}`)
+      videoFiles.forEach((file, index) => {
+        console.log(`  Video ${index + 1}: ${file}`)
+      })
+      
       await this.verifyInputFiles([assets.audioFilepath, ...videoFiles])
+      console.log(`✅ All input files verified`)
 
       // Generate caption file
+      console.log(`📝 Generating caption file...`)
       const audioDurationMs = await this.getAudioDuration(assets.audioFilepath)
+      console.log(`🔊 Audio duration: ${audioDurationMs}ms (${(audioDurationMs / 1000).toFixed(2)}s)`)
+      
       const captionFile = await this.generateCaptionFile(
         storyId,
         assets.script.trim(),
         assets.audioFilepath,
         audioDurationMs
       )
+      console.log(`📝 Caption file generated: ${captionFile}`)
+
+      // Verify caption file was created and log its content
+      try {
+        const captionContent = await fs.readFile(captionFile, 'utf-8')
+        if (captionContent) {
+          console.log(`📝 Caption file content (first 300 chars):`)
+          console.log(captionContent.substring(0, 300) + '...')
+          
+          const chunks = this.createCaptionChunks(assets.script.trim())
+          console.log(`📊 Caption chunks (${chunks.length}): ${chunks.slice(0, 5).join(' | ')}${chunks.length > 5 ? '...' : ''}`)
+        }
+      } catch (readError) {
+        // Skip logging this error in tests as it's expected when mocking filesystem
+        if (process.env.NODE_ENV !== 'test') {
+          console.error(`❌ Failed to read caption file: ${readError}`)
+        }
+      }
 
       // Create output directory
       const outputDir = path.join(process.cwd(), 'output')
       await fs.mkdir(outputDir, { recursive: true })
       
-      const outputFile = path.join(outputDir, `${storyId}.mp4`)
+      // Create unique filename with timestamp to avoid caching issues
+      const timestamp = Date.now()
+      const outputFile = path.join(outputDir, `${storyId}-${timestamp}.mp4`)
+      console.log(`🎯 Output file: ${outputFile}`)
 
       // Build and execute ffmpeg command
       const ffmpegArgs = this.buildFFmpegCommand({
@@ -72,21 +106,54 @@ export class FFmpegService {
         captionFile
       }, outputFile)
 
+      console.log(`🚀 FFmpeg command:`)
+      console.log(`ffmpeg ${ffmpegArgs.join(' ')}`)
+      
+      // Also log the subtitle filter specifically
+      const vfIndex = ffmpegArgs.indexOf('-vf')
+      const filterComplexIndex = ffmpegArgs.indexOf('-filter_complex')
+      if (vfIndex !== -1) {
+        console.log(`📝 Subtitle filter: ${ffmpegArgs[vfIndex + 1]}`)
+      } else if (filterComplexIndex !== -1) {
+        console.log(`📝 Complex filter: ${ffmpegArgs[filterComplexIndex + 1]}`)
+      }
+
       await this.executeFFmpegCommand(ffmpegArgs)
+      console.log(`✅ FFmpeg execution completed`)
 
       // Get final video duration
       const durationSec = await this.getVideoDuration(outputFile)
+      console.log(`📊 Final video duration: ${durationSec}s`)
+
+      // Also create a symlink with the original name for easy access
+      const standardOutputFile = path.join(outputDir, `${storyId}.mp4`)
+      try {
+        // Remove existing symlink/file if it exists
+        await fs.unlink(standardOutputFile).catch(() => {})
+        // Create symlink to the timestamped file
+        await fs.symlink(path.basename(outputFile), standardOutputFile)
+        console.log(`🔗 Created symlink: ${standardOutputFile} -> ${path.basename(outputFile)}`)
+      } catch (symlinkError: unknown) {
+        const errorMessage = symlinkError instanceof Error ? symlinkError.message : String(symlinkError)
+        console.warn(`⚠️ Could not create symlink: ${errorMessage}`)
+      }
 
       return {
-        filepath: outputFile,
+        filepath: outputFile, // Return the timestamped file path
         durationSec
       }
     } catch (error) {
+      if (process.env.NODE_ENV !== 'test') {
+        console.error(`❌ Video assembly failed for story ${storyId}:`, error)
+      }
+      
       if (error instanceof FFmpegServiceError) {
         throw error
       }
       
-      console.error('Video assembly failed:', error)
+      if (process.env.NODE_ENV !== 'test') {
+        console.error('Video assembly failed:', error)
+      }
       throw new FFmpegServiceError(
         'Failed to assemble video',
         'ASSEMBLY_FAILED'
@@ -117,40 +184,12 @@ export class FFmpegService {
 
       return data[0] as Video
     } catch (error) {
-      console.error('Failed to create final video:', error)
+      if (process.env.NODE_ENV !== 'test') {
+        console.error('Failed to create final video:', error)
+      }
       throw new FFmpegServiceError(
         'Failed to save video to database',
         'VIDEO_CREATION_FAILED'
-      )
-    }
-  }
-
-  async assembleVideoForStory(storyId: string, assets: VideoAssemblyAssets): Promise<Video> {
-    let assembledFilepath: string | null = null
-
-    try {
-      const { filepath, durationSec } = await this.assembleVideo(storyId, assets)
-      assembledFilepath = filepath
-
-      const video = await this.createFinalVideo(storyId, filepath, durationSec)
-      
-      return video
-    } catch (error) {
-      if (assembledFilepath) {
-        try {
-          await fs.unlink(assembledFilepath)
-        } catch (cleanupError) {
-          console.error('Failed to cleanup video file:', cleanupError)
-        }
-      }
-
-      if (error instanceof FFmpegServiceError) {
-        throw error
-      }
-
-      throw new FFmpegServiceError(
-        'Failed to assemble video for story',
-        'STORY_ASSEMBLY_FAILED'
       )
     }
   }
@@ -189,14 +228,43 @@ export class FFmpegService {
   private createCaptionChunks(script: string): string[] {
     const words = script.trim().split(/\s+/)
     const chunks: string[] = []
-    const wordsPerChunk = 4 // Optimal for readability and pacing
-
-    for (let i = 0; i < words.length; i += wordsPerChunk) {
-      const chunk = words.slice(i, i + wordsPerChunk).join(' ')
-      chunks.push(chunk)
+    
+    if (words.length === 0) return chunks
+    if (words.length === 1) return [words[0]]
+    if (words.length === 2) return [words.join(' ')]
+    
+    // For scripts with 3+ words, create 2-word chunks primarily
+    // Allow single-word chunks as final chunks if needed
+    let i = 0
+    while (i < words.length) {
+      const remainingWords = words.length - i
+      
+      if (remainingWords === 1) {
+        // Single word left - create a single-word chunk
+        chunks.push(words[i])
+        break
+      } else if (remainingWords === 2) {
+        // Two words left - keep together
+        chunks.push(words.slice(i, i + 2).join(' '))
+        break
+      } else if (remainingWords === 3) {
+        // Three words left - take 2 words, then handle the last one
+        chunks.push(words.slice(i, i + 2).join(' '))
+        i += 2
+        // This will leave 1 word for the next iteration, which will be a single-word chunk
+      } else {
+        // 4+ words remaining - take 2 words
+        chunks.push(words.slice(i, i + 2).join(' '))
+        i += 2
+      }
     }
 
     return chunks
+  }
+
+  private getOptimalChunkSize(words: string[], currentIndex: number): number {
+    // This method is no longer used but kept for backwards compatibility
+    return 2
   }
 
   private generateSRTContent(chunks: string[], audioDurationMs: number): string {
@@ -220,20 +288,26 @@ export class FFmpegService {
     inputs: { audioFile: string; videoFiles: string[]; captionFile: string },
     outputFile: string
   ): string[] {
-    // Optimized subtitle styling for vertical videos (portrait mode)
+    // Enhanced subtitle styling for exciting, modern captions
     const subtitleStyle = [
-      'Fontsize=18',           // Smaller font for vertical video
-      'PrimaryColour=&Hffffff&', // White text
-      'OutlineColour=&H000000&', // Black outline
-      'Outline=2',             // Outline thickness
-      'Shadow=1',              // Drop shadow for better readability
-      'BackColour=&H80000000&', // Semi-transparent black background
-      'Spacing=0',             // Letter spacing
-      'MarginV=60',            // Bottom margin (positions text higher from bottom)
-      'MarginL=40',            // Left margin
-      'MarginR=40',            // Right margin
-      'Alignment=2',           // Bottom center alignment
-      'WrapStyle=2'            // Smart wrapping
+      'Fontname=Arial Black',       // Bold, impactful font
+      'Fontsize=24',               // Larger, more readable font size
+      'PrimaryColour=&Hffffff&',   // Pure white text
+      'SecondaryColour=&H00ffff&', // Cyan secondary color for effects
+      'OutlineColour=&H000000&',   // Black outline
+      'BackColour=&H40000000&',    // Semi-transparent black background (more opaque)
+      'Outline=3',                 // Thicker outline for better contrast
+      'Shadow=2',                  // Stronger drop shadow
+      'Bold=1',                    // Bold text
+      'ScaleX=105',                // Slightly wider text for impact
+      'ScaleY=105',                // Slightly taller text
+      'Spacing=1',                 // Slightly spaced letters for clarity
+      'MarginV=80',                // Higher bottom margin for better positioning
+      'MarginL=60',                // Wider left margin to ensure text fits
+      'MarginR=60',                // Wider right margin to ensure text fits
+      'Alignment=2',               // Bottom center alignment
+      'BorderStyle=3',             // Box background style
+      'WrapStyle=0'                // No word wrapping (we control chunks)
     ].join(',')
 
     // Handle single video file (backward compatibility)
@@ -266,7 +340,7 @@ export class FFmpegService {
     const segmentDuration = Math.floor(30 / inputs.videoFiles.length) // Split into equal segments
     const videoProcessing = inputs.videoFiles.map((_, index) => {
       const inputIndex = index + 1 // +1 because input 0 is audio
-      return `[${inputIndex}:v]trim=duration=${segmentDuration},scale=720:1280,setsar=1[v${index}]`
+      return `[${inputIndex}:v]trim=duration=${segmentDuration},scale=768:1280,setsar=1[v${index}]`
     }).join(';')
     
     const videoConcatenation = inputs.videoFiles.map((_, index) => `[v${index}]`).join('') + 
@@ -294,26 +368,73 @@ export class FFmpegService {
 
   private async executeFFmpegCommand(args: string[]): Promise<void> {
     return new Promise((resolve, reject) => {
+      console.log(`🚀 Executing FFmpeg with args: ${args.slice(0, 10).join(' ')}${args.length > 10 ? '...' : ''}`)
+      
       const process = spawn('ffmpeg', args)
       let stderr = ''
+      let stdout = ''
 
       const timeout = setTimeout(() => {
+        console.error(`⏰ FFmpeg process timed out after ${this.PROCESS_TIMEOUT_MS}ms`)
         process.kill('SIGKILL')
         reject(new FFmpegServiceError('FFmpeg process timed out', 'TIMEOUT'))
       }, this.PROCESS_TIMEOUT_MS)
 
+      process.stdout.on('data', (data: Buffer) => {
+        const output = data.toString()
+        stdout += output
+        // Log significant stdout output (though FFmpeg usually uses stderr)
+        if (output.length > 50) {
+          console.log(`📤 FFmpeg stdout: ${output.substring(0, 200)}...`)
+        }
+      })
+
       process.stderr.on('data', (data: Buffer) => {
-        stderr += data.toString()
+        const output = data.toString()
+        stderr += output
+        
+        // Log progress and key information from FFmpeg stderr
+        if (output.includes('frame=') || output.includes('time=')) {
+          // Progress information - log sparingly
+          const timeMatch = output.match(/time=(\S+)/)
+          if (timeMatch) {
+            console.log(`⏳ FFmpeg progress: ${timeMatch[1]}`)
+          }
+        } else if (output.includes('Stream mapping') || output.includes('Output #0')) {
+          console.log(`📊 FFmpeg info: ${output.trim()}`)
+        } else if (output.includes('error') || output.includes('Error') || output.includes('failed')) {
+          console.error(`❌ FFmpeg error: ${output.trim()}`)
+        } else if (output.includes('warning') || output.includes('Warning')) {
+          console.warn(`⚠️ FFmpeg warning: ${output.trim()}`)
+        }
       })
 
       process.on('close', (code: number) => {
         clearTimeout(timeout)
         
+        console.log(`🏁 FFmpeg process finished with exit code: ${code}`)
+        
         if (code === 0) {
+          console.log(`✅ FFmpeg execution successful`)
           resolve()
         } else {
+          console.error(`❌ FFmpeg failed with code ${code}`)
+          console.error(`❌ FFmpeg stderr (last 1000 chars): ${stderr.slice(-1000)}`)
+          
+          // Try to extract more specific error information
+          const errorLines = stderr.split('\n').filter(line => 
+            line.toLowerCase().includes('error') || 
+            line.toLowerCase().includes('failed') ||
+            line.toLowerCase().includes('invalid')
+          )
+          
+          if (errorLines.length > 0) {
+            console.error(`❌ Specific FFmpeg errors:`)
+            errorLines.forEach(line => console.error(`   ${line.trim()}`))
+          }
+          
           reject(new FFmpegServiceError(
-            `FFmpeg process failed with exit code ${code}: ${stderr}`,
+            `FFmpeg process failed with exit code ${code}. Error: ${errorLines.join('; ') || stderr.slice(-500)}`,
             'FFMPEG_ERROR'
           ))
         }
@@ -321,6 +442,7 @@ export class FFmpegService {
 
       process.on('error', (error: Error) => {
         clearTimeout(timeout)
+        console.error(`❌ Failed to spawn FFmpeg process:`, error)
         reject(new FFmpegServiceError(
           `Failed to spawn FFmpeg process: ${error.message}`,
           'SPAWN_ERROR'

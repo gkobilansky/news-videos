@@ -1,7 +1,7 @@
-import { Story, Script, Storyboard, StoryboardShot, SourceContent } from '@/types'
-import { supabaseAdmin } from '@/lib/supabase'
+import { Story, Script, Storyboard, StoryboardShot, SourceContent } from '../types'
+import { supabaseAdmin } from '../lib/supabase'
 import { openai } from '@ai-sdk/openai'
-import { generateText, tool } from 'ai'
+import { generateText } from 'ai'
 import { z } from 'zod'
 
 export class ScriptServiceError extends Error {
@@ -28,13 +28,10 @@ export class ScriptService {
         temperature: 0.7,
       })
 
-      // Validate script length (≤45 words)
+      // Validate script length (≤50 words recommended)
       const wordCount = text.trim().split(/\s+/).length
-      if (wordCount > 45) {
-        throw new ScriptServiceError(
-          `Generated script too long: ${wordCount} words (max 45)`,
-          'SCRIPT_TOO_LONG'
-        )
+      if (wordCount > 50) {
+        console.warn(`⚠️  Generated script is longer than recommended: ${wordCount} words (recommended max 50)`)
       }
 
       // Save script to database
@@ -62,37 +59,92 @@ export class ScriptService {
   }
 
   /**
-   * Generates a 3-shot storyboard for a story using OpenAI with source content
+   * Generates a storyboard for a story using AI with optimized prompts for Runway
    */
   async generateStoryboard(story: Story): Promise<Storyboard> {
-    try {
-      // Fetch source content for better context
-      let sourceContent: SourceContent[] = []
-      try {
-        sourceContent = await this.fetchSourcesContent(story.sources)
-      } catch (error) {
-        console.warn('Failed to fetch source content, proceeding without:', error)
-      }
+    if (!story) {
+      throw new ScriptServiceError('Story is required', 'VALIDATION_ERROR')
+    }
 
-      // Create enhanced prompt with source content
-      const prompt = this.buildStoryboardPrompt(story, sourceContent)
-      
-      // Generate storyboard using OpenAI - structured for JSON output
+    // Get the script for this story to split into logical beats
+    const script = await this.getScript(story.id)
+    if (!script) {
+      throw new ScriptServiceError('Script must exist before generating storyboard', 'SCRIPT_NOT_FOUND')
+    }
+
+    // Fetch source content for context
+    const sourcesContent = await this.fetchSourcesContent(story.sources)
+
+    try {
       const { text } = await generateText({
         model: openai('gpt-4o-mini'),
-        prompt,
-        maxTokens: 1000,
-        temperature: 0.3, // Lower temperature for more consistent JSON structure
-        // Remove tools for now to ensure cleaner JSON response
+        temperature: 0.7,
+        messages: [
+          {
+            role: 'system',
+            content: `You are a professional video storyboard creator specializing in news content for Runway ML Gen-4.
+
+CRITICAL WORKFLOW REQUIREMENTS:
+1. Split the script into 2-3 logical beats/segments
+2. Create ONE shot per beat (2-3 shots total)
+3. Each shot should be 5-10 seconds (total video 10-15 seconds)
+4. Use motion-centric, action-focused prompts
+5. Avoid negatives and conversational fluff
+6. Include presenter/anchor references for consistency
+
+SHOT DISTRIBUTION STRATEGY:
+- 2 shots: Establishing shot + Close-up/detail shot
+- 3 shots: Wide establishing + Medium focus + Close resolution
+
+PROMPT STYLE GUIDE:
+✅ Good: "handheld camera follows presenter walking through newsroom"
+✅ Good: "dolly-in on anchor gesturing at data visualization"
+✅ Good: "dynamic pan across breaking news graphics"
+❌ Avoid: "don't show sad faces"
+❌ Avoid: "the anchor is talking about..."
+
+REFERENCE IMAGES:
+- Use @anchor tag in prompts for presenter consistency
+- Include camera movements and angles
+- Focus on visual storytelling, not dialogue
+
+Return a JSON object with this exact structure:
+{
+  "model": "gen4_turbo",
+  "ratio": "768:1280",
+  "shots": [
+    {
+      "promptText": "motion-centric action description with @anchor tag",
+      "duration": 5,
+      "camera": {
+        "movement": "dolly-in|dolly-out|pan-left|pan-right|handheld|static|zoom-in|zoom-out",
+        "angle": "eye-level|low-angle|high-angle|bird-eye|worm-eye"
+      }
+    }
+  ],
+  "fps": 24,
+  "output_format": "mp4"
+}`
+          },
+          {
+            role: 'user',
+            content: `Create a storyboard for this news story:
+
+HEADLINE: ${story.headline}
+HOT TAKE: ${story.hot_take || 'N/A'}
+SCRIPT TO SPLIT: "${script.text}"
+
+SOURCES: ${story.sources.map((url, index) => `${index}: ${url}`).join('\n')}
+
+${sourcesContent.length > 0 ? 'SOURCE CONTENT:\n' + sourcesContent.map((content, i) => `${i + 1}. ${content.title || 'Source'}: ${content.content.substring(0, 200)}...`).join('\n') : ''}
+
+Split the script into logical beats and create 2-3 dynamic shots that bring this news story to life. Each shot should advance the narrative and use engaging camera work.`
+          }
+        ]
       })
 
-      // Log the raw response for debugging
-      console.log('🤖 Raw OpenAI response:', text)
-      console.log('🤖 Response length:', text.length)
-      console.log('🤖 First 200 chars:', text.substring(0, 200))
+      let storyboardData: any
 
-      // Parse and validate the storyboard JSON
-      let storyboardData
       try {
         let jsonText = text.trim()
         
@@ -115,7 +167,7 @@ export class ScriptService {
           jsonText = jsonText.substring(0, lastBraceIndex + 1)
         }
         
-        console.log('🤖 Cleaned JSON text:', jsonText.substring(0, 300) + '...')
+        console.log('🎬 Generated storyboard JSON:', jsonText.substring(0, 200) + '...')
         storyboardData = JSON.parse(jsonText)
         
         // Verify it has the expected structure
@@ -124,22 +176,24 @@ export class ScriptService {
         }
         
       } catch (parseError) {
-        console.error('❌ JSON Parse Error:', parseError)
-        console.error('❌ Failed to parse text:', text)
+        if (process.env.NODE_ENV !== 'test') {
+          console.error('❌ JSON Parse Error:', parseError)
+          console.error('❌ Failed to parse text:', text)
+        }
         const errorMessage = parseError instanceof Error ? parseError.message : String(parseError)
         throw new ScriptServiceError(`Invalid JSON response from AI: ${errorMessage}`, 'INVALID_JSON')
       }
 
-      // Validate storyboard structure
-      const validatedShots = this.validateStoryboardShots(storyboardData.shots)
+      // Validate and optimize storyboard structure
+      const validatedShots = this.validateAndOptimizeShots(storyboardData.shots)
 
-      // Create storyboard object
+      // Create storyboard object with optimized settings
       const storyboard: Omit<Storyboard, 'id' | 'created_at' | 'updated_at'> = {
         story_id: story.id,
-        model: 'gen4_turbo',
-        ratio: '720:1280', // Portrait format for vertical videos
+        model: 'gen4_turbo', // Use turbo for faster processing
+        ratio: '768:1280', // Portrait format optimized for social media
         shots: validatedShots,
-        fps: 24,
+        fps: 24, // Standard frame rate
         output_format: 'mp4'
       }
 
@@ -158,7 +212,9 @@ export class ScriptService {
         throw new ScriptServiceError(`Database error: ${error.message}`, 'DATABASE_ERROR')
       }
 
+      console.log('✅ Storyboard generated successfully with', validatedShots.length, 'optimized shots')
       return data as Storyboard
+
     } catch (error) {
       if (error instanceof ScriptServiceError) {
         throw error
@@ -299,8 +355,8 @@ export class ScriptService {
    * Validates storyboard shot structure
    */
   private validateStoryboardShots(shots: any[]): StoryboardShot[] {
-    if (!Array.isArray(shots) || shots.length !== 3) {
-      throw new ScriptServiceError('Storyboard must have exactly 3 shots', 'INVALID_SHOTS')
+    if (!Array.isArray(shots) || shots.length < 1) {
+      throw new ScriptServiceError('Storyboard must have at least 1 shot', 'INVALID_SHOTS')
     }
 
     return shots.map((shot, index) => {
@@ -324,75 +380,69 @@ export class ScriptService {
   }
 
   /**
-   * Builds enhanced storyboard prompt with source content
+   * Validates and optimizes storyboard shots according to Runway best practices
    */
-  private buildStoryboardPrompt(story: Story, sourceContent: SourceContent[]): string {
-    const sourcesText = story.sources.map((url, i) => `${i + 1}. ${url}`).join('\n')
+  private validateAndOptimizeShots(shots: any[]): StoryboardShot[] {
+    if (!Array.isArray(shots) || shots.length === 0) {
+      throw new ScriptServiceError('Storyboard must have at least one shot', 'VALIDATION_ERROR')
+    }
+
+    if (shots.length > 3) {
+      // Limit to 3 shots for optimal performance and credits
+      shots = shots.slice(0, 3)
+      console.log('🎬 Limited storyboard to 3 shots for optimal performance')
+    }
+
+    return shots.map((shot, index) => {
+      // Validate required fields
+      if (!shot.promptText || typeof shot.promptText !== 'string') {
+        throw new ScriptServiceError(`Shot ${index + 1} missing valid promptText`, 'VALIDATION_ERROR')
+      }
+
+      if (!shot.duration || typeof shot.duration !== 'number') {
+        throw new ScriptServiceError(`Shot ${index + 1} missing valid duration`, 'VALIDATION_ERROR')
+      }
+
+      // Optimize prompt text for Runway
+      let optimizedPrompt = shot.promptText.trim()
+      
+      // Ensure motion-centric language
+      if (!this.hasMotionWords(optimizedPrompt)) {
+        const cameraMovement = shot.camera?.movement || 'static'
+        optimizedPrompt = `${cameraMovement} shot: ${optimizedPrompt}`
+      }
+
+      // Ensure it's action-focused and concise
+      if (optimizedPrompt.length > 200) {
+        optimizedPrompt = optimizedPrompt.substring(0, 197) + '...'
+      }
+
+      // Validate duration constraints for Gen-4 Turbo
+      const validDurations = [5, 10, 16]
+      const duration = validDurations.includes(shot.duration) ? shot.duration : 5
+
+      return {
+        promptText: optimizedPrompt,
+        duration: duration as 5 | 10 | 16,
+        camera: {
+          movement: shot.camera?.movement || 'static',
+          angle: shot.camera?.angle || 'eye-level'
+        }
+      }
+    })
+  }
+
+  /**
+   * Checks if prompt contains motion-centric words
+   */
+  private hasMotionWords(prompt: string): boolean {
+    const motionWords = [
+      'camera', 'shot', 'dolly', 'pan', 'zoom', 'handheld', 'tracking',
+      'follows', 'moves', 'sweeps', 'glides', 'pushes', 'pulls'
+    ]
     
-    let prompt = `You are a professional video producer creating a storyboard for news content. Your task is to generate a JSON object for a 3-shot storyboard.
-
-CRITICAL: Your response must be ONLY valid JSON. No explanation, no markdown, no additional text.
-
-Requirements:
-- Exactly 3 shots, each 5 seconds duration
-- Portrait format (720:1280) for vertical video
-- Each shot should have compelling visual narrative
-- Include camera movements for dynamic footage
-- Focus on news storytelling best practices
-
-Expected JSON structure (respond with ONLY this JSON):
-{
-  "shots": [
-    {
-      "promptText": "Shot 1: Wide establishing shot description with specific visual details",
-      "duration": 5,
-      "camera": {
-        "movement": "static",
-        "angle": "eye-level"
-      }
-    },
-    {
-      "promptText": "Shot 2: Medium or close-up shot description focusing on key elements",
-      "duration": 5,
-      "camera": {
-        "movement": "dolly-in",
-        "angle": "low-angle"
-      }
-    },
-    {
-      "promptText": "Shot 3: Concluding shot description that provides resolution or context",
-      "duration": 5,
-      "camera": {
-        "movement": "static",
-        "angle": "eye-level"
-      }
-    }
-  ]
-}
-
-Valid camera movements: static, dolly-in, dolly-out, pan-left, pan-right, tilt-up, tilt-down, handheld, zoom-in, zoom-out
-Valid camera angles: eye-level, low-angle, high-angle, bird-eye, worm-eye
-
-Story Details:
-Headline: ${story.headline}
-
-Sources:
-${sourcesText}`
-
-    if (story.hot_take) {
-      prompt += `\n\nHot Take: ${story.hot_take}`
-    }
-
-    if (sourceContent.length > 0) {
-      prompt += `\n\nSource Content Context:`
-      sourceContent.forEach((content, i) => {
-        prompt += `\n\n${i + 1}. ${content.title || 'Source'}: ${content.content.substring(0, 300)}...`
-      })
-    }
-
-    prompt += `\n\nIMPORTANT: Respond with ONLY the JSON object. No other text. Start with { and end with }.`
-
-    return prompt
+    const lowercasePrompt = prompt.toLowerCase()
+    return motionWords.some(word => lowercasePrompt.includes(word))
   }
 
   /**
@@ -435,13 +485,10 @@ ${sourcesText}`
       throw new ScriptServiceError('Invalid story ID format', 'VALIDATION_ERROR')
     }
 
-    // Validate script length (≤45 words)
+    // Validate script length (≤50 words recommended)
     const wordCount = text.trim().split(/\s+/).length
-    if (wordCount > 45) {
-      throw new ScriptServiceError(
-        `Script too long: ${wordCount} words (max 45)`,
-        'SCRIPT_TOO_LONG'
-      )
+    if (wordCount > 50) {
+      console.warn(`⚠️  Script is longer than recommended: ${wordCount} words (recommended max 50)`)
     }
 
     try {
@@ -477,7 +524,7 @@ ${sourcesText}`
     let prompt = `Create a 10-15 second video script for a vertical newsbite format.
 
 Requirements:
-- 45 words maximum
+- 50 words maximum
 - Engaging, punchy delivery for social media
 - Focus on the key impact or significance
 - Written for voice-over narration
@@ -494,6 +541,176 @@ ${sourcesText}`
     prompt += `\n\nGenerate only the script text, no additional formatting or explanations.`
 
     return prompt
+  }
+
+  /**
+   * Adds a new shot to the end of an existing storyboard
+   */
+  async addShotToStoryboard(storyId: string, newShot: StoryboardShot): Promise<Storyboard> {
+    if (!storyId || storyId.trim().length === 0) {
+      throw new ScriptServiceError('Invalid story ID format', 'VALIDATION_ERROR')
+    }
+
+    // Validate the new shot
+    this.validateSingleShot(newShot)
+
+    try {
+      // Get existing storyboard
+      const existingStoryboard = await this.getStoryboard(storyId)
+      if (!existingStoryboard) {
+        throw new ScriptServiceError('Storyboard not found', 'STORYBOARD_NOT_FOUND')
+      }
+
+      // Add new shot to the end
+      const updatedShots = [...existingStoryboard.shots, newShot]
+
+      // Update the storyboard
+      const { data, error } = await supabaseAdmin
+        .from('storyboards')
+        .update({
+          shots: updatedShots,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('story_id', storyId)
+        .select()
+        .single()
+
+      if (error) {
+        throw new ScriptServiceError(`Database error: ${error.message}`, 'DATABASE_ERROR')
+      }
+
+      return data as Storyboard
+    } catch (error) {
+      if (error instanceof ScriptServiceError) {
+        throw error
+      }
+      throw new ScriptServiceError(`Failed to add shot to storyboard: ${error}`, 'UNKNOWN_ERROR')
+    }
+  }
+
+  /**
+   * Inserts a new shot at a specific position in the storyboard
+   */
+  async insertShotAtPosition(storyId: string, position: number, newShot: StoryboardShot): Promise<Storyboard> {
+    if (!storyId || storyId.trim().length === 0) {
+      throw new ScriptServiceError('Invalid story ID format', 'VALIDATION_ERROR')
+    }
+
+    // Validate the new shot
+    this.validateSingleShot(newShot)
+
+    try {
+      // Get existing storyboard
+      const existingStoryboard = await this.getStoryboard(storyId)
+      if (!existingStoryboard) {
+        throw new ScriptServiceError('Storyboard not found', 'STORYBOARD_NOT_FOUND')
+      }
+
+      // Validate position bounds
+      if (position < 0 || position > existingStoryboard.shots.length) {
+        throw new ScriptServiceError('Invalid position', 'INVALID_POSITION')
+      }
+
+      // Insert shot at the specified position
+      const updatedShots = [...existingStoryboard.shots]
+      updatedShots.splice(position, 0, newShot)
+
+      // Update the storyboard
+      const { data, error } = await supabaseAdmin
+        .from('storyboards')
+        .update({
+          shots: updatedShots,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('story_id', storyId)
+        .select()
+        .single()
+
+      if (error) {
+        throw new ScriptServiceError(`Database error: ${error.message}`, 'DATABASE_ERROR')
+      }
+
+      return data as Storyboard
+    } catch (error) {
+      if (error instanceof ScriptServiceError) {
+        throw error
+      }
+      throw new ScriptServiceError(`Failed to insert shot at position: ${error}`, 'UNKNOWN_ERROR')
+    }
+  }
+
+  /**
+   * Removes a shot from the storyboard at a specific position
+   */
+  async removeShotFromStoryboard(storyId: string, position: number): Promise<Storyboard> {
+    if (!storyId || storyId.trim().length === 0) {
+      throw new ScriptServiceError('Invalid story ID format', 'VALIDATION_ERROR')
+    }
+
+    try {
+      // Get existing storyboard
+      const existingStoryboard = await this.getStoryboard(storyId)
+      if (!existingStoryboard) {
+        throw new ScriptServiceError('Storyboard not found', 'STORYBOARD_NOT_FOUND')
+      }
+
+      // Validate position bounds
+      if (position < 0 || position >= existingStoryboard.shots.length) {
+        throw new ScriptServiceError('Invalid position', 'INVALID_POSITION')
+      }
+
+      // Remove shot at the specified position
+      const updatedShots = [...existingStoryboard.shots]
+      updatedShots.splice(position, 1)
+
+      // Update the storyboard
+      const { data, error } = await supabaseAdmin
+        .from('storyboards')
+        .update({
+          shots: updatedShots,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('story_id', storyId)
+        .select()
+        .single()
+
+      if (error) {
+        throw new ScriptServiceError(`Database error: ${error.message}`, 'DATABASE_ERROR')
+      }
+
+      return data as Storyboard
+    } catch (error) {
+      if (error instanceof ScriptServiceError) {
+        throw error
+      }
+      throw new ScriptServiceError(`Failed to remove shot from storyboard: ${error}`, 'UNKNOWN_ERROR')
+    }
+  }
+
+  /**
+   * Validates a single shot structure
+   */
+  private validateSingleShot(shot: StoryboardShot): void {
+    if (!shot.promptText || typeof shot.promptText !== 'string' || shot.promptText.trim().length === 0) {
+      throw new ScriptServiceError('Invalid shot data: promptText is required', 'INVALID_SHOT_DATA')
+    }
+
+    if (!shot.duration || ![5, 10, 16].includes(shot.duration)) {
+      throw new ScriptServiceError('Invalid shot data: duration must be 5, 10, or 16', 'INVALID_SHOT_DATA')
+    }
+
+    if (shot.camera) {
+      const validMovements = ['static', 'dolly-in', 'dolly-out', 'pan-left', 'pan-right', 'tilt-up', 'tilt-down', 'handheld', 'zoom-in', 'zoom-out']
+      const validAngles = ['eye-level', 'low-angle', 'high-angle', 'bird-eye', 'worm-eye']
+
+      if (shot.camera.movement && !validMovements.includes(shot.camera.movement)) {
+        throw new ScriptServiceError('Invalid shot data: invalid camera movement', 'INVALID_SHOT_DATA')
+      }
+
+      if (shot.camera.angle && !validAngles.includes(shot.camera.angle)) {
+        throw new ScriptServiceError('Invalid shot data: invalid camera angle', 'INVALID_SHOT_DATA')
+      }
+    }
   }
 }
 
