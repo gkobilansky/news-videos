@@ -2,6 +2,7 @@
 
 import { imageGenerationService } from '@/services/image-generation-service'
 import { scriptService } from '@/services/script-service'
+import { storyService } from '@/services/story-service'
 import { Asset } from '@/types'
 
 export async function generateStoryboardImagesAction(storyId: string): Promise<
@@ -9,14 +10,24 @@ export async function generateStoryboardImagesAction(storyId: string): Promise<
   | { success: false; error: string }
 > {
   try {
+    // Check if script exists first
+    const script = await scriptService.getScript(storyId)
+    if (!script) {
+      return { success: false, error: 'Script must be generated before creating storyboard images. Please generate a script first.' }
+    }
+
     // Get the storyboard for this story
     const storyboard = await scriptService.getStoryboard(storyId)
     if (!storyboard) {
-      return { success: false, error: 'Storyboard not found' }
+      return { success: false, error: 'Storyboard not found. Please generate a storyboard first.' }
     }
 
-    // Generate images for all shots in the storyboard
-    const result = await imageGenerationService.generateStoryboardImages(storyId, storyboard)
+    // Get story details for character consistency
+    const story = await storyService.getStory(storyId)
+    const headline = story?.headline
+
+    // Generate images for all shots in the storyboard with character consistency
+    const result = await imageGenerationService.generateStoryboardImages(storyId, storyboard, headline)
     
     // Extract asset objects from the result
     const images = result.images.map(img => img.asset)
@@ -40,14 +51,24 @@ export async function regenerateStoryboardImagesAction(storyId: string): Promise
   | { success: false; error: string }
 > {
   try {
+    // Check if script exists first
+    const script = await scriptService.getScript(storyId)
+    if (!script) {
+      return { success: false, error: 'Script must be generated before creating storyboard images. Please generate a script first.' }
+    }
+
     // Get the storyboard for this story
     const storyboard = await scriptService.getStoryboard(storyId)
     if (!storyboard) {
-      return { success: false, error: 'Storyboard not found' }
+      return { success: false, error: 'Storyboard not found. Please generate a storyboard first.' }
     }
 
-    // Regenerate images for all shots in the storyboard
-    const result = await imageGenerationService.regenerateStoryboardImages(storyId, storyboard)
+    // Get story details for character consistency
+    const story = await storyService.getStory(storyId)
+    const headline = story?.headline
+
+    // Regenerate images for all shots in the storyboard with character consistency
+    const result = await imageGenerationService.regenerateStoryboardImages(storyId, storyboard, headline)
     
     // Extract asset objects from the result
     const images = result.images.map(img => img.asset)

@@ -223,21 +223,84 @@ export class ScriptService {
     const validatedShots = this.validateStoryboardShots(shots)
 
     try {
-      const { data, error } = await supabaseAdmin
+      // First check if a storyboard exists for this story
+      const { data: existingStoryboards, error: fetchError } = await supabaseAdmin
         .from('storyboards')
-        .update({
-          shots: validatedShots,
-          updated_at: new Date().toISOString(),
-        })
+        .select('*')
         .eq('story_id', storyId)
-        .select()
-        .single()
 
-      if (error) {
-        throw new ScriptServiceError(`Database error: ${error.message}`, 'DATABASE_ERROR')
+      if (fetchError) {
+        throw new ScriptServiceError(`Database error: ${fetchError.message}`, 'DATABASE_ERROR')
       }
 
-      return data as Storyboard
+      if (!existingStoryboards || existingStoryboards.length === 0) {
+        // No storyboard exists, create one
+        const { data, error } = await supabaseAdmin
+          .from('storyboards')
+          .insert({
+            story_id: storyId,
+            shots: validatedShots,
+            updated_at: new Date().toISOString(),
+          })
+          .select()
+          .single()
+
+        if (error) {
+          throw new ScriptServiceError(`Database error: ${error.message}`, 'DATABASE_ERROR')
+        }
+
+        return data as Storyboard
+      } else if (existingStoryboards.length > 1) {
+        // Multiple storyboards exist - this is a data integrity issue
+        // Delete duplicates and keep the most recent one
+        const sortedStoryboards = existingStoryboards.sort((a, b) => 
+          new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+        )
+        const keepStoryboard = sortedStoryboards[0]
+        const deleteIds = sortedStoryboards.slice(1).map(s => s.id)
+
+        // Delete duplicates
+        if (deleteIds.length > 0) {
+          await supabaseAdmin
+            .from('storyboards')
+            .delete()
+            .in('id', deleteIds)
+        }
+
+        // Update the remaining storyboard
+        const { data, error } = await supabaseAdmin
+          .from('storyboards')
+          .update({
+            shots: validatedShots,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', keepStoryboard.id)
+          .select()
+          .single()
+
+        if (error) {
+          throw new ScriptServiceError(`Database error: ${error.message}`, 'DATABASE_ERROR')
+        }
+
+        return data as Storyboard
+      } else {
+        // Single storyboard exists, update it
+        const { data, error } = await supabaseAdmin
+          .from('storyboards')
+          .update({
+            shots: validatedShots,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('story_id', storyId)
+          .select()
+          .single()
+
+        if (error) {
+          throw new ScriptServiceError(`Database error: ${error.message}`, 'DATABASE_ERROR')
+        }
+
+        return data as Storyboard
+      }
     } catch (error) {
       if (error instanceof ScriptServiceError) {
         throw error
@@ -259,17 +322,25 @@ export class ScriptService {
         .from('storyboards')
         .select('*')
         .eq('story_id', storyId)
-        .single()
 
       if (error) {
-        // Handle not found vs other errors
-        if (error.code === 'PGRST116') {
-          return null
-        }
         throw new ScriptServiceError(`Database error: ${error.message}`, 'DATABASE_ERROR')
       }
 
-      return data as Storyboard
+      if (!data || data.length === 0) {
+        return null
+      }
+
+      if (data.length > 1) {
+        // Multiple storyboards exist - return the most recent one
+        console.warn(`⚠️ Multiple storyboards found for story ${storyId}, returning most recent`)
+        const sortedStoryboards = data.sort((a, b) => 
+          new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+        )
+        return sortedStoryboards[0] as Storyboard
+      }
+
+      return data[0] as Storyboard
     } catch (error) {
       if (error instanceof ScriptServiceError) {
         throw error
@@ -446,17 +517,25 @@ export class ScriptService {
         .from('scripts')
         .select('*')
         .eq('story_id', storyId)
-        .single()
 
       if (error) {
-        // Handle not found vs other errors
-        if (error.code === 'PGRST116') {
-          return null
-        }
         throw new ScriptServiceError(`Database error: ${error.message}`, 'DATABASE_ERROR')
       }
 
-      return data as Script
+      if (!data || data.length === 0) {
+        return null
+      }
+
+      if (data.length > 1) {
+        // Multiple scripts exist - return the most recent one
+        console.warn(`⚠️ Multiple scripts found for story ${storyId}, returning most recent`)
+        const sortedScripts = data.sort((a, b) => 
+          new Date(b.edited_at).getTime() - new Date(a.edited_at).getTime()
+        )
+        return sortedScripts[0] as Script
+      }
+
+      return data[0] as Script
     } catch (error) {
       if (error instanceof ScriptServiceError) {
         throw error
@@ -480,21 +559,84 @@ export class ScriptService {
     }
 
     try {
-      const { data, error } = await supabaseAdmin
+      // First check if a script exists for this story
+      const { data: existingScript, error: fetchError } = await supabaseAdmin
         .from('scripts')
-        .update({
-          text: text.trim(),
-          edited_at: new Date().toISOString(),
-        })
+        .select('*')
         .eq('story_id', storyId)
-        .select()
-        .single()
 
-      if (error) {
-        throw new ScriptServiceError(`Database error: ${error.message}`, 'DATABASE_ERROR')
+      if (fetchError) {
+        throw new ScriptServiceError(`Database error: ${fetchError.message}`, 'DATABASE_ERROR')
       }
 
-      return data as Script
+      if (!existingScript || existingScript.length === 0) {
+        // No script exists, create one
+        const { data, error } = await supabaseAdmin
+          .from('scripts')
+          .insert({
+            story_id: storyId,
+            text: text.trim(),
+            edited_at: new Date().toISOString(),
+          })
+          .select()
+          .single()
+
+        if (error) {
+          throw new ScriptServiceError(`Database error: ${error.message}`, 'DATABASE_ERROR')
+        }
+
+        return data as Script
+      } else if (existingScript.length > 1) {
+        // Multiple scripts exist - this is a data integrity issue
+        // Delete duplicates and keep the most recent one
+        const sortedScripts = existingScript.sort((a, b) => 
+          new Date(b.edited_at).getTime() - new Date(a.edited_at).getTime()
+        )
+        const keepScript = sortedScripts[0]
+        const deleteIds = sortedScripts.slice(1).map(s => s.id)
+
+        // Delete duplicates
+        if (deleteIds.length > 0) {
+          await supabaseAdmin
+            .from('scripts')
+            .delete()
+            .in('id', deleteIds)
+        }
+
+        // Update the remaining script
+        const { data, error } = await supabaseAdmin
+          .from('scripts')
+          .update({
+            text: text.trim(),
+            edited_at: new Date().toISOString(),
+          })
+          .eq('id', keepScript.id)
+          .select()
+          .single()
+
+        if (error) {
+          throw new ScriptServiceError(`Database error: ${error.message}`, 'DATABASE_ERROR')
+        }
+
+        return data as Script
+      } else {
+        // Single script exists, update it
+        const { data, error } = await supabaseAdmin
+          .from('scripts')
+          .update({
+            text: text.trim(),
+            edited_at: new Date().toISOString(),
+          })
+          .eq('story_id', storyId)
+          .select()
+          .single()
+
+        if (error) {
+          throw new ScriptServiceError(`Database error: ${error.message}`, 'DATABASE_ERROR')
+        }
+
+        return data as Script
+      }
     } catch (error) {
       if (error instanceof ScriptServiceError) {
         throw error

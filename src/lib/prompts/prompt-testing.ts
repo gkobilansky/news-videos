@@ -108,7 +108,7 @@ export class PromptTester {
           ratio: '768:1280',
           shots: [
             {
-              promptText: 'dolly-in on @anchor presenting at news desk',
+              promptText: 'dolly-in on professional news presenter in business attire presenting at news desk',
               duration: 5,
               camera: { movement: 'dolly-in', angle: 'eye-level' }
             },

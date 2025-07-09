@@ -278,6 +278,28 @@ A generated video file must:
   - **Test Coverage**: 16 comprehensive tests covering prompt rendering, validation, and system integration
   - **Benefits**: Centralized management, version control, validation, consistency, and easy iteration
 
+- **Character Consistency & Image Caching Fixes**: Improved RunwayML integration and browser caching
+  - **Character Consistency**: Fixed RunwayML API usage for consistent character appearance
+    - Replaced ineffective @anchor tags with descriptive presenter text in prompts
+    - Implemented base presenter image generation for character consistency
+    - Enhanced image generation with headline context for better relevance
+  - **Database Integrity**: Robust handling of duplicate records in database operations
+    - Enhanced script and storyboard services to handle multiple records gracefully
+    - Automatic cleanup of duplicate database entries with most recent record preservation
+    - Improved error handling for database operations with proper validation
+  - **Browser Caching Fix**: Solved image caching issues in reference image display
+    - Added cache-busting timestamps to image URLs (`src/components/storyboard-images.tsx`)
+    - Fixed browser caching preventing display of regenerated images
+    - Ensures fresh image display after regeneration operations
+  - **Service Integration**: Fixed service method calls and imports
+    - Corrected `getStory()` method calls in image generation actions
+    - Proper service separation between `scriptService` and `storyService`
+    - Updated test expectations to match current implementation (gen3a_turbo model)
+  - **Test Coverage**: Updated and fixed failing tests across the codebase
+    - Fixed video generation service tests to match current model configuration
+    - Updated UI tests to match current button text patterns
+    - Maintained comprehensive test coverage while fixing implementation details
+
 ### 🚧 Active Development Areas
 - **User Story U3**: Final video generation pipeline integration and testing
 - **Video Pipeline Optimization**: Performance tuning and error recovery

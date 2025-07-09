@@ -103,9 +103,9 @@ export default function ScriptPage() {
   }
 
   // Calculate word count and validation
-  const wordCount = scriptText.trim().split(/\s+/).filter(Boolean).length
+  const wordCount = scriptText.trim() ? scriptText.trim().split(/\s+/).filter(Boolean).length : 0
   const isValidLength = wordCount <= 45
-  const hasChanges = script && script.text !== scriptText
+  const hasChanges = script && script.text.trim() !== scriptText.trim()
 
   if (loading) {
     return (
@@ -209,10 +209,10 @@ export default function ScriptPage() {
               <div className="flex gap-4 mt-6">
                 <button
                   onClick={handleSaveScript}
-                  disabled={saving || !isValidLength || !hasChanges}
+                  disabled={saving || !isValidLength || !scriptText.trim()}
                   className="bg-green-600 text-white py-2 px-6 rounded hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
                 >
-                  {saving ? 'Saving...' : 'Save Script'}
+                  {saving ? 'Saving...' : hasChanges ? 'Save Changes' : 'Save Script'}
                 </button>
 
                 <button
@@ -222,6 +222,15 @@ export default function ScriptPage() {
                 >
                   {generating ? 'Regenerating...' : 'Regenerate with AI'}
                 </button>
+              </div>
+              
+              {/* Debug info */}
+              <div className="mt-4 p-3 bg-gray-100 rounded text-sm">
+                <div>Current word count: {wordCount}</div>
+                <div>Has changes: {hasChanges ? 'Yes' : 'No'}</div>
+                <div>Valid length: {isValidLength ? 'Yes' : 'No'}</div>
+                <div>Script text length: {scriptText.length} characters</div>
+                <div>Original script length: {script?.text?.length || 0} characters</div>
               </div>
             </div>
           )}

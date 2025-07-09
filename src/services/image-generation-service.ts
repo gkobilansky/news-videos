@@ -44,9 +44,69 @@ export class ImageGenerationService {
   }
 
   /**
-   * Generate reference images for all shots in a storyboard
+   * Generate a base presenter image for character consistency
    */
-  async generateStoryboardImages(storyId: string, storyboard: Storyboard): Promise<StoryboardImageResult> {
+  async generateBasePresenterImage(storyId: string, headline: string): Promise<ImageGenerationResult> {
+    try {
+      console.log(`👨‍💼 Generating base presenter image for story ${storyId}...`)
+      
+      const presenterPrompt = `Professional news presenter in business attire at modern news desk, clean background, studio lighting, portrait format, news anchor appearance, confident expression, looking at camera. Context: ${headline.substring(0, 100)}`
+      
+      const imageResult = await this.generateImageForShot(storyId, {
+        promptText: presenterPrompt,
+        duration: 5,
+        camera: { movement: 'static', angle: 'eye-level' }
+      }, 0, 'base_presenter')
+      
+      console.log(`✅ Base presenter image generated: ${path.basename(imageResult.imagePath)}`)
+      return imageResult
+      
+    } catch (error) {
+      console.error('Failed to generate base presenter image:', error)
+      throw new ImageGenerationServiceError(
+        'Failed to generate base presenter image for character consistency',
+        'BASE_PRESENTER_GENERATION_FAILED'
+      )
+    }
+  }
+
+  /**
+   * Get existing base presenter image or generate one if it doesn't exist
+   */
+  async getOrCreateBasePresenterImage(storyId: string, headline: string): Promise<ImageGenerationResult | null> {
+    try {
+      // Check if base presenter image already exists
+      const { data: existingAssets, error } = await this.supabase
+        .from('assets')
+        .select('*')
+        .eq('story_id', storyId)
+        .eq('kind', 'image')
+        .eq('provider', 'runway')
+        .like('filepath', '%base_presenter%')
+        .limit(1)
+
+      if (!error && existingAssets && existingAssets.length > 0) {
+        const asset = existingAssets[0] as Asset
+        console.log(`♻️ Using existing base presenter image: ${path.basename(asset.filepath)}`)
+        return {
+          imagePath: asset.filepath,
+          asset
+        }
+      }
+
+      // Generate new base presenter image
+      return await this.generateBasePresenterImage(storyId, headline)
+      
+    } catch (error) {
+      console.error('Failed to get or create base presenter image:', error)
+      return null // Return null to continue without presenter template
+    }
+  }
+
+  /**
+   * Generate reference images for all shots in a storyboard with character consistency
+   */
+  async generateStoryboardImages(storyId: string, storyboard: Storyboard, headline?: string): Promise<StoryboardImageResult> {
     if (!storyId || !storyId.trim()) {
       throw new ImageGenerationServiceError('Story ID is required', 'INVALID_STORY_ID')
     }
@@ -59,6 +119,17 @@ export class ImageGenerationService {
       console.log(`🎨 Starting image generation for ${storyboard.shots.length} shots...`)
       
       const imageResults: ImageGenerationResult[] = []
+      
+      // Get or create base presenter image for character consistency
+      let basePresenterImage: ImageGenerationResult | null = null
+      if (headline) {
+        console.log(`👨‍💼 Setting up character consistency with base presenter image...`)
+        basePresenterImage = await this.getOrCreateBasePresenterImage(storyId, headline)
+        if (basePresenterImage) {
+          imageResults.push(basePresenterImage)
+          console.log(`✅ Base presenter image ready for character consistency`)
+        }
+      }
 
       // Generate image for each shot
       for (let i = 0; i < storyboard.shots.length; i++) {
@@ -87,7 +158,10 @@ export class ImageGenerationService {
         throw new ImageGenerationServiceError('No images were generated successfully', 'NO_IMAGES_GENERATED')
       }
 
-      console.log(`🎉 Generated ${imageResults.length}/${storyboard.shots.length} images successfully`)
+      // Calculate actual shots generated (excluding base presenter image)
+      const shotsGenerated = imageResults.length - (basePresenterImage ? 1 : 0)
+      console.log(`🎉 Generated ${shotsGenerated}/${storyboard.shots.length} shot images successfully` + 
+                  (basePresenterImage ? ' (plus base presenter template)' : ''))
 
       return {
         storyId,
@@ -113,7 +187,7 @@ export class ImageGenerationService {
   /**
    * Generate a single image for a storyboard shot
    */
-  async generateImageForShot(storyId: string, shot: StoryboardShot, shotIndex: number): Promise<ImageGenerationResult> {
+  async generateImageForShot(storyId: string, shot: StoryboardShot, shotIndex: number, filenamePrefix?: string): Promise<ImageGenerationResult> {
     if (!storyId || !storyId.trim()) {
       throw new ImageGenerationServiceError('Story ID is required', 'INVALID_STORY_ID')
     }
@@ -131,10 +205,11 @@ export class ImageGenerationService {
       }
 
       // Download and store the image locally
+      const filename = filenamePrefix || `shot${shotIndex}`
       const localImagePath = await this.downloadImage(
         storyId, 
         imageTask.output[0], 
-        `shot${shotIndex}`,
+        filename,
         1 // Default take number
       )
 
@@ -226,13 +301,13 @@ export class ImageGenerationService {
   /**
    * Regenerate images for a storyboard
    */
-  async regenerateStoryboardImages(storyId: string, storyboard: Storyboard): Promise<StoryboardImageResult> {
+  async regenerateStoryboardImages(storyId: string, storyboard: Storyboard, headline?: string): Promise<StoryboardImageResult> {
     try {
       // Clean up existing image assets first
       await this.cleanupExistingImageAssets(storyId)
 
-      // Generate new images
-      return await this.generateStoryboardImages(storyId, storyboard)
+      // Generate new images with character consistency
+      return await this.generateStoryboardImages(storyId, storyboard, headline)
 
     } catch (error: any) {
       if (error instanceof ImageGenerationServiceError) {

@@ -238,7 +238,7 @@ describe('ScriptPage', () => {
         fireEvent.change(textarea, { target: { value: 'Updated script content' } })
       })
       
-      const saveButton = screen.getByRole('button', { name: /save script/i })
+      const saveButton = screen.getByRole('button', { name: /save (changes|script)/i })
       
       await act(async () => {
         fireEvent.click(saveButton)
@@ -294,7 +294,7 @@ describe('ScriptPage', () => {
 
       // Assert
       expect(screen.getByText(/script too long/i)).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /save script/i })).toBeDisabled()
+      expect(screen.getByRole('button', { name: /save (changes|script)/i })).toBeDisabled()
     })
 
     it('should handle script update errors', async () => {
@@ -321,7 +321,7 @@ describe('ScriptPage', () => {
         fireEvent.change(textarea, { target: { value: 'Updated script' } })
       })
       
-      const saveButton = screen.getByRole('button', { name: /save script/i })
+      const saveButton = screen.getByRole('button', { name: /save (changes|script)/i })
       
       await act(async () => {
         fireEvent.click(saveButton)

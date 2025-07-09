@@ -114,11 +114,11 @@ describe('VideoGenerationService', () => {
       })
 
       expect(mockRunway.imageToVideo.create).toHaveBeenCalledWith({
-        model: 'gen4_turbo',
+        model: 'gen3a_turbo',
         promptText: 'A futuristic cityscape with flying cars and neon lights',
         promptImage: 'https://runway.ai/image/output-123.jpg',
         duration: 10,
-        ratio: '720:1280'
+        ratio: '768:1280'
       })
 
       expect(result).toEqual({
@@ -581,17 +581,20 @@ describe('VideoGenerationService', () => {
       expect((videoService as any).createVideoFromImageTask).toHaveBeenNthCalledWith(
         1,
         expect.stringContaining('story123-shot1.jpg'), // Uses existing local path
-        'Wide establishing shot of tech conference, cinematic lighting'
+        'Wide establishing shot of tech conference, cinematic lighting',
+        'gen3a_turbo'
       )
       expect((videoService as any).createVideoFromImageTask).toHaveBeenNthCalledWith(
         2,
         expect.stringContaining('story123-shot2.jpg'),
-        'Close-up handheld shot of excited scientist, dramatic'
+        'Close-up handheld shot of excited scientist, dramatic',
+        'gen3a_turbo'
       )
       expect((videoService as any).createVideoFromImageTask).toHaveBeenNthCalledWith(
         3,
         expect.stringContaining('story123-shot3.jpg'),
-        'Dolly-in final shot showing breakthrough technology, warm tones'
+        'Dolly-in final shot showing breakthrough technology, warm tones',
+        'gen3a_turbo'
       )
     })
 

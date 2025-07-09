@@ -47,7 +47,9 @@ export function StoryboardImages({
     const cleanPath = asset.filepath.startsWith('/') ? asset.filepath.slice(1) : asset.filepath
     // Remove 'assets/' prefix if present since our API route expects paths relative to assets
     const pathWithoutAssets = cleanPath.startsWith('assets/') ? cleanPath.slice(7) : cleanPath
-    return `/api/assets/${pathWithoutAssets}`
+    // Add cache-busting timestamp to prevent browser caching issues
+    const timestamp = asset.created_at ? new Date(asset.created_at).getTime() : Date.now()
+    return `/api/assets/${pathWithoutAssets}?t=${timestamp}`
   }
 
   const hasImages = images.length > 0

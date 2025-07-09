@@ -96,7 +96,7 @@ PROMPT STYLE GUIDE:
 ❌ Avoid: "the anchor is talking about..."
 
 REFERENCE IMAGES:
-- Use @anchor tag in prompts for presenter consistency
+- Use consistent presenter descriptions (e.g., "professional news presenter in business attire")
 - Include camera movements and angles
 - Focus on visual storytelling, not dialogue
 
@@ -106,7 +106,7 @@ Return a JSON object with this exact structure:
   "ratio": "768:1280",
   "shots": [
     {
-      "promptText": "motion-centric action description with @anchor tag",
+      "promptText": "motion-centric action description with professional news presenter",
       "duration": 5,
       "camera": {
         "movement": "dolly-in|dolly-out|pan-left|pan-right|handheld|static|zoom-in|zoom-out",
