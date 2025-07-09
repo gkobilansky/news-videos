@@ -472,7 +472,7 @@ describe('VideoGenerationService', () => {
   })
 
   describe('generateVideoFromStoryboard', () => {
-    it('should generate individual video clips for each shot and return all clips', async () => {
+    it('should generate individual video clips using existing reference images', async () => {
       const mockStoryboard = {
         model: 'gen4_turbo',
         ratio: '768:1280',
@@ -495,24 +495,36 @@ describe('VideoGenerationService', () => {
         ]
       }
 
-      // Mock the createImageGenerationTask to return different images for each shot
-      const mockImageOutputs = [
-        ['https://example.com/reference-image.jpg'], // Reference image for presenter
-        ['https://example.com/shot1-image.jpg'],     // Shot 1 image
-        ['https://example.com/shot2-image.jpg'],     // Shot 2 image
-        ['https://example.com/shot3-image.jpg']      // Shot 3 image
-      ]
-      
-      let imageCallCount = 0
-      ;(videoService as any).createImageGenerationTask = jest.fn().mockImplementation(() => {
-        const output = mockImageOutputs[imageCallCount]
-        imageCallCount++
-        return Promise.resolve({
-          id: `image-task-${imageCallCount}`,
-          status: 'completed',
-          output
+      // Mock existing image assets from database
+      const mockExistingImages = [
+        createMockAsset({
+          id: 'asset-1',
+          story_id: 'story123',
+          kind: 'image',
+          provider: 'runway',
+          filepath: 'assets/images/story123-shot1.jpg',
+          metadata: { shotIndex: 1 }
+        }),
+        createMockAsset({
+          id: 'asset-2',
+          story_id: 'story123',
+          kind: 'image',
+          provider: 'runway',
+          filepath: 'assets/images/story123-shot2.jpg',
+          metadata: { shotIndex: 2 }
+        }),
+        createMockAsset({
+          id: 'asset-3',
+          story_id: 'story123',
+          kind: 'image',
+          provider: 'runway',
+          filepath: 'assets/images/story123-shot3.jpg',
+          metadata: { shotIndex: 3 }
         })
-      })
+      ]
+
+      // Mock getExistingImageAssets to return the existing images
+      ;(videoService as any).getExistingImageAssets = jest.fn().mockResolvedValue(mockExistingImages)
 
       // Mock the createVideoFromImageTask to return different videos for each shot
       const mockVideoOutputs = [
@@ -546,21 +558,6 @@ describe('VideoGenerationService', () => {
         return Promise.resolve(path)
       })
 
-      // Mock the downloadImage method to return local image paths
-      const mockDownloadedImagePaths = [
-        '/path/to/story123-reference.jpg',
-        '/path/to/story123-shot1.jpg',
-        '/path/to/story123-shot2.jpg',
-        '/path/to/story123-shot3.jpg'
-      ]
-      
-      let imageDownloadCallCount = 0
-      ;(videoService as any).downloadImage = jest.fn().mockImplementation(() => {
-        const path = mockDownloadedImagePaths[imageDownloadCallCount]
-        imageDownloadCallCount++
-        return Promise.resolve(path)
-      })
-
       const result = await videoService.generateVideoFromStoryboard('story123', mockStoryboard)
 
       expect(result).toEqual({
@@ -573,46 +570,32 @@ describe('VideoGenerationService', () => {
         duration: 15 // 5 + 5 + 5 seconds
       })
 
-      // Verify all methods were called correctly
-      expect((videoService as any).createImageGenerationTask).toHaveBeenCalledTimes(4) // 1 reference + 3 shots
+      // Verify existing images were retrieved
+      expect((videoService as any).getExistingImageAssets).toHaveBeenCalledWith('story123')
+      
+      // Verify videos were generated from existing images (no new image generation)
       expect((videoService as any).createVideoFromImageTask).toHaveBeenCalledTimes(3) // 3 shots
       expect((videoService as any).downloadVideo).toHaveBeenCalledTimes(3) // 3 clips
-      expect((videoService as any).downloadImage).toHaveBeenCalledTimes(4) // 1 reference + 3 shots
       
-      // Verify the reference image was generated first
-      expect((videoService as any).createImageGenerationTask).toHaveBeenNthCalledWith(
-        1,
-        expect.stringContaining('Professional news presenter')
-      )
-      
-      // Verify the reference image download
-      expect((videoService as any).downloadImage).toHaveBeenNthCalledWith(
-        1,
-        'story123',
-        expect.stringContaining('https://example.com/reference-image.jpg'),
-        'reference',
-        undefined
-      )
-      
-      // Verify each shot was processed with local image paths
+      // Verify each shot was processed with existing local image paths
       expect((videoService as any).createVideoFromImageTask).toHaveBeenNthCalledWith(
         1,
-        '/path/to/story123-shot1.jpg', // Uses local path instead of URL
+        expect.stringContaining('story123-shot1.jpg'), // Uses existing local path
         'Wide establishing shot of tech conference, cinematic lighting'
       )
       expect((videoService as any).createVideoFromImageTask).toHaveBeenNthCalledWith(
         2,
-        '/path/to/story123-shot2.jpg',
+        expect.stringContaining('story123-shot2.jpg'),
         'Close-up handheld shot of excited scientist, dramatic'
       )
       expect((videoService as any).createVideoFromImageTask).toHaveBeenNthCalledWith(
         3,
-        '/path/to/story123-shot3.jpg',
+        expect.stringContaining('story123-shot3.jpg'),
         'Dolly-in final shot showing breakthrough technology, warm tones'
       )
     })
 
-    it('should handle reference image generation failure gracefully', async () => {
+    it('should throw error when no reference images exist', async () => {
       const mockStoryboard = {
         model: 'gen4_turbo',
         ratio: '768:1280',
@@ -624,51 +607,15 @@ describe('VideoGenerationService', () => {
         ]
       }
 
-      // Mock reference image generation failure
-      let callCount = 0
-      ;(videoService as any).createImageGenerationTask = jest.fn().mockImplementation(() => {
-        callCount++
-        if (callCount === 1) {
-          // First call (reference image) fails
-          throw new Error('Reference image generation failed')
-        }
-        // Second call (shot image) succeeds
-        return Promise.resolve({
-          id: 'shot-image-task',
-          status: 'completed',
-          output: ['https://example.com/shot-image.jpg']
-        })
-      })
+      // Mock getExistingImageAssets to return empty array (no existing images)
+      ;(videoService as any).getExistingImageAssets = jest.fn().mockResolvedValue([])
 
-      ;(videoService as any).createVideoFromImageTask = jest.fn().mockResolvedValue({
-        id: 'video-task',
-        status: 'completed',
-        output: ['https://example.com/shot-video.mp4']
-      })
+      await expect(
+        videoService.generateVideoFromStoryboard('story123', mockStoryboard)
+      ).rejects.toThrow('No reference images found for story. Please generate storyboard images first.')
 
-      ;(videoService as any).downloadVideo = jest.fn().mockResolvedValue(
-        '/path/to/story123-storyboard-shot1.mp4'
-      )
-
-      ;(videoService as any).downloadImage = jest.fn().mockImplementation((storyId, imageUrl, prefix) => {
-        if (prefix === 'reference') {
-          // This shouldn't be called since reference generation fails
-          throw new Error('Reference image download should not be called')
-        }
-        return Promise.resolve('/path/to/story123-shot1.jpg')
-      })
-
-      const result = await videoService.generateVideoFromStoryboard('story123', mockStoryboard)
-
-      expect(result).toEqual({
-        videoPath: '/path/to/story123-storyboard-shot1.mp4',
-        allClips: ['/path/to/story123-storyboard-shot1.mp4'],
-        duration: 5
-      })
-
-      // Should still proceed with shot generation despite reference image failure
-      expect((videoService as any).createImageGenerationTask).toHaveBeenCalledTimes(2)
-      expect((videoService as any).createVideoFromImageTask).toHaveBeenCalledTimes(1)
+      // Should check for existing images first
+      expect((videoService as any).getExistingImageAssets).toHaveBeenCalledWith('story123')
     })
 
     it('should throw error for invalid storyboard', async () => {

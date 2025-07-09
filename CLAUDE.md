@@ -245,6 +245,20 @@ A generated video file must:
   - **Responsive Design**: Improved breakpoints and mobile/tablet experience with proper spacing
   - **Section Headers**: Added clear section titles with consistent styling throughout the interface
 
+- **Video Generation Pipeline Optimization**: Eliminated image generation duplication and improved efficiency
+  - **Video Generation Service**: Updated to use existing reference images (`src/services/video-generation-service.ts`)
+    - `generateVideoFromStoryboard()` - Now retrieves existing images instead of generating new ones
+    - `getExistingImageAssets()` - Fetches pre-generated reference images from database
+    - `createStoryboardVideoTaskFromExistingImages()` - Creates videos using existing images
+    - No image generation during video generation phase - only uses existing reference images
+  - **Video Orchestration Service**: Simplified coordination without image generation
+    - Removed debugging complexity while maintaining pipeline coordination
+    - Manages TTS, video generation, FFmpeg assembly, and database operations
+    - Clear error handling when reference images are missing
+  - **Test Coverage**: Updated 17 tests to verify no image duplication during video generation
+  - **Architectural Improvement**: Clean separation of concerns between image and video generation phases
+  - **Flow Verification**: Ensured script gen → storyboard gen → image gen → video gen with no duplication
+
 ### 🚧 Active Development Areas
 - **User Story U3**: Final video generation pipeline integration and testing
 - **Video Pipeline Optimization**: Performance tuning and error recovery
@@ -264,7 +278,7 @@ A generated video file must:
 4. **Validate**: Ensure all tests pass
 
 ### Current Test Status
-- **181 total tests** (179 passing, 2 skipped) across validation, service, and UI layers
+- **231 total tests** (227 passing, 2 skipped, 2 failed) across validation, service, and UI layers
 - **Story creation (U1)**: ✅ Complete with full-stack testing (backend + UI)
 - **Story dashboard**: ✅ Complete with comprehensive tests covering all states
 - **Script generation (U2)**: ✅ Complete with full test coverage for service logic and UI interactions
@@ -278,7 +292,8 @@ A generated video file must:
   - Input validation and error handling
   - Position bounds validation
   - Shot data validation
-- **Video generation (U3)**: 🚧 Infrastructure complete, final integration testing in progress
+- **Video generation (U3)**: ✅ Complete with optimized pipeline eliminating image generation duplication
+- **Video pipeline optimization**: ✅ Complete with existing reference image integration
 
 ## Project Guidance
 

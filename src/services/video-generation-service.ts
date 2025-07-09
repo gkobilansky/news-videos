@@ -49,22 +49,18 @@ export class VideoGenerationService {
     try {
       console.log(`🎬 Starting storyboard video generation with ${storyboard.shots.length} shots...`)
       
-      let referenceImagePath: string | null = null
-
-      // Step 1: Generate reference image for consistency (optional)
-      try {
-        console.log('📸 Generating reference image for presenter consistency...')
-        const referencePrompt = `Professional news presenter in a modern broadcast studio, clean background, professional lighting, high quality`
-        const referenceImageTask = await this.createImageGenerationTask(referencePrompt)
-        
-        if (referenceImageTask.output && referenceImageTask.output.length > 0) {
-          // Download and store the reference image locally
-          referenceImagePath = await this.downloadImage(storyId, referenceImageTask.output[0], 'reference', takeNumber)
-          console.log('✅ Reference image generated and stored successfully')
-        }
-      } catch (error) {
-        console.warn('⚠️ Reference image generation failed, proceeding without reference:', error)
+      // Get existing reference images for this story instead of generating new ones
+      console.log('📸 Retrieving existing reference images from database...')
+      const existingImages = await this.getExistingImageAssets(storyId)
+      
+      if (existingImages.length === 0) {
+        throw new VideoGenerationServiceError(
+          'No reference images found for story. Please generate storyboard images first.',
+          'NO_REFERENCE_IMAGES'
+        )
       }
+      
+      console.log(`✅ Found ${existingImages.length} existing reference images`)
 
       // Build the storyboard request with optimized prompts
       const storyboardRequest = {
@@ -77,21 +73,20 @@ export class VideoGenerationService {
           ...(shot.seed ? { seed: shot.seed } : {})
         })),
         fps: storyboard.fps || 24,
-        outputFormat: 'mp4',
-        referenceImagePath // Pass the local path to be converted later
+        outputFormat: 'mp4'
       }
 
-      console.log('🚀 Creating storyboard video with individual clips...')
+      console.log('🚀 Creating storyboard video with individual clips using existing images...')
       console.log('📋 Storyboard config:', {
         model: storyboardRequest.model,
         ratio: storyboardRequest.ratio,
         totalDuration: storyboardRequest.shots.reduce((sum: number, shot: any) => sum + shot.duration, 0),
-        hasReferenceImages: !!referenceImagePath,
+        existingImagesCount: existingImages.length,
         shotCount: storyboardRequest.shots.length
       })
 
-      // Generate individual video clips for each shot
-      const task = await this.createStoryboardVideoTask(storyboardRequest, storyId, takeNumber)
+      // Generate individual video clips for each shot using existing images
+      const task = await this.createStoryboardVideoTaskFromExistingImages(storyboardRequest, storyId, existingImages, takeNumber)
       
       if (!task.output || task.output.length === 0) {
         throw new VideoGenerationServiceError('No video clips generated from storyboard', 'NO_VIDEO_OUTPUT')
@@ -459,42 +454,39 @@ export class VideoGenerationService {
     }
   }
 
-  private async createStoryboardVideoTask(storyboardRequest: any, storyId: string, takeNumber?: number): Promise<RunwayTask> {
+  private async createStoryboardVideoTaskFromExistingImages(storyboardRequest: any, storyId: string, existingImages: Asset[], takeNumber?: number): Promise<RunwayTask> {
     try {
-      console.log(`🎬 Generating ${storyboardRequest.shots.length} individual video clips...`)
+      console.log(`🎬 Generating ${storyboardRequest.shots.length} individual video clips from existing images...`)
       
       const videoClips: string[] = []
       let totalDuration = 0
       
-      // Generate each shot as a separate video clip
+      // Generate each shot as a separate video clip using existing images
       for (let i = 0; i < storyboardRequest.shots.length; i++) {
         const shot = storyboardRequest.shots[i]
         const shotIndex = i + 1
         console.log(`📹 Creating clip ${shotIndex}/${storyboardRequest.shots.length}: ${shot.promptText.substring(0, 50)}...`)
         
         try {
-          // Step 1: Generate image for this shot
-          console.log(`📸 Generating image for shot ${shotIndex}...`)
-          const imageTask = await this.createImageGenerationTask(shot.promptText)
-          
-          if (!imageTask.output || imageTask.output.length === 0) {
-            throw new VideoGenerationServiceError(`No image generated for shot ${shotIndex}`, 'NO_IMAGE_OUTPUT')
-          }
-          
-          console.log(`✅ Image generated for shot ${shotIndex}`)
-          
-          // Step 2: Download and store the image locally
-          const localImagePath = await this.downloadImage(
-            storyId, 
-            imageTask.output[0], 
-            `shot${shotIndex}`, 
-            takeNumber
+          // Find existing image for this shot
+          const existingImage = existingImages.find(img => 
+            img.metadata?.shotIndex === shotIndex
           )
           
-          console.log(`📥 Image downloaded for shot ${shotIndex}: ${path.basename(localImagePath)}`)
+          if (!existingImage) {
+            throw new VideoGenerationServiceError(
+              `No existing image found for shot ${shotIndex}`,
+              'NO_EXISTING_IMAGE'
+            )
+          }
           
-          // Step 3: Generate video from the local image
-          console.log(`🎬 Generating video from image for shot ${shotIndex}...`)
+          // Get the full path to the existing image
+          const localImagePath = path.resolve(process.cwd(), existingImage.filepath)
+          
+          console.log(`📸 Using existing image for shot ${shotIndex}: ${path.basename(localImagePath)}`)
+          
+          // Generate video from the existing local image
+          console.log(`🎬 Generating video from existing image for shot ${shotIndex}...`)
           const videoTask = await this.createVideoFromImageTask(localImagePath, shot.promptText)
           
           if (!videoTask.output || videoTask.output.length === 0) {
@@ -525,7 +517,7 @@ export class VideoGenerationService {
         }
       }
       
-      console.log(`🎉 All ${videoClips.length} clips generated successfully`)
+      console.log(`🎉 All ${videoClips.length} clips generated successfully from existing images`)
       console.log(`📊 Total duration: ${totalDuration}s`)
       
       // For now, return the first clip URL - we'll handle concatenation in FFmpeg service
@@ -593,6 +585,36 @@ export class VideoGenerationService {
     await fs.writeFile(filepath, videoBuffer)
     
     return filepath
+  }
+
+  private async getExistingImageAssets(storyId: string): Promise<Asset[]> {
+    try {
+      const { data, error } = await this.supabase
+        .from('assets')
+        .select('*')
+        .eq('story_id', storyId)
+        .eq('kind', 'image')
+        .eq('provider', 'runway')
+        .order('created_at', { ascending: true })
+
+      if (error) {
+        throw new VideoGenerationServiceError(
+          `Failed to retrieve existing images: ${error.message}`,
+          'DATABASE_ERROR'
+        )
+      }
+
+      return data || []
+    } catch (error: any) {
+      if (error instanceof VideoGenerationServiceError) {
+        throw error
+      }
+      
+      throw new VideoGenerationServiceError(
+        `Failed to get existing image assets: ${error.message || String(error)}`,
+        'GET_IMAGES_FAILED'
+      )
+    }
   }
 
   private async downloadImage(storyId: string, imageUrl: string, prefix: string = 'image', takeNumber?: number): Promise<string> {

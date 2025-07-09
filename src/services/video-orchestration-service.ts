@@ -244,7 +244,7 @@ export class VideoOrchestrationService {
 
     if (storyboard) {
       // Use storyboard-based video generation
-      console.log('Using storyboard-based video generation with image consistency...')
+      console.log('Using storyboard-based video generation with existing reference images...')
       const videoResult = await videoGenerationService.generateVideoFromStoryboard(storyId, storyboard)
       
       if (!videoResult) {
@@ -254,16 +254,7 @@ export class VideoOrchestrationService {
         )
       }
 
-      // Enhanced debugging - let's see exactly what we get back
-      console.log('🔍 DEBUG: Video generation result structure:', {
-        hasVideoPath: !!videoResult.videoPath,
-        hasAllClips: !!videoResult.allClips,
-        allClipsLength: videoResult.allClips ? videoResult.allClips.length : 'undefined',
-        allClipsType: typeof videoResult.allClips,
-        duration: videoResult.duration,
-        videoPath: videoResult.videoPath,
-        firstFewClips: videoResult.allClips ? videoResult.allClips.slice(0, 3) : 'undefined'
-      })
+      // Video generation completed successfully
 
       console.log('Storyboard video generation succeeded')
       console.log(`Successfully generated storyboard video for story ${storyId}`)
@@ -274,8 +265,7 @@ export class VideoOrchestrationService {
           console.log(`  📄 Clip ${index + 1}: ${clip}`)
         })
         
-        // Return ALL clips for concatenation, not just the first one
-        console.log(`🔍 DEBUG: Returning ${videoResult.allClips.length} clips for FFmpeg`)
+        // Return ALL clips for concatenation
         return videoResult.allClips
       } else {
         console.error('🚨 ERROR: videoResult.allClips is empty or undefined!')
