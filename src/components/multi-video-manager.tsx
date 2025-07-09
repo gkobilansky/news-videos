@@ -183,8 +183,23 @@ export function MultiVideoManager({ story, script }: MultiVideoManagerProps) {
                   </span>
                 </div>
                 
-                <div className="bg-gray-100 rounded-lg h-32 mb-3 flex items-center justify-center">
-                  <div className="text-gray-400 text-sm">Video Preview</div>
+                <div className="bg-gray-100 rounded-lg h-32 mb-3 flex items-center justify-center overflow-hidden">
+                  {video.filepath ? (
+                    <video
+                      className="w-full h-full object-cover rounded-lg"
+                      controls
+                      preload="metadata"
+                      poster="" // Optional: Add a poster image if available
+                    >
+                      <source 
+                        src={`/api/videos/${video.filepath.split('/').pop() || video.filepath.split('\\').pop()}`} 
+                        type="video/mp4" 
+                      />
+                      Your browser does not support the video tag.
+                    </video>
+                  ) : (
+                    <div className="text-gray-400 text-sm">Processing...</div>
+                  )}
                 </div>
                 
                 <div className="flex gap-2">
