@@ -15,6 +15,7 @@ export interface VideoAssemblyAssets {
   audioFilepath: string
   videoFilepath: string | string[] // Support single video or array of videos for cutting
   script: string
+  shotDurations?: number[] // Individual shot durations for multiple video files
 }
 
 export interface VideoAssemblyResult {
@@ -100,10 +101,11 @@ export class FFmpegService {
       console.log(`🎯 Output file: ${outputFile}`)
 
       // Build and execute ffmpeg command
-      const ffmpegArgs = this.buildFFmpegCommand({
+      const ffmpegArgs = await this.buildFFmpegCommand({
         audioFile: assets.audioFilepath,
         videoFiles: videoFiles,
-        captionFile
+        captionFile,
+        shotDurations: assets.shotDurations
       }, outputFile)
 
       console.log(`🚀 FFmpeg command:`)
@@ -284,10 +286,10 @@ export class FFmpegService {
     return srtContent
   }
 
-  private buildFFmpegCommand(
-    inputs: { audioFile: string; videoFiles: string[]; captionFile: string },
+  private async buildFFmpegCommand(
+    inputs: { audioFile: string; videoFiles: string[]; captionFile: string; shotDurations?: number[] },
     outputFile: string
-  ): string[] {
+  ): Promise<string[]> {
     // Enhanced subtitle styling for exciting, modern captions
     const subtitleStyle = [
       'Fontname=Arial Black',       // Bold, impactful font
@@ -336,11 +338,22 @@ export class FFmpegService {
     })
 
     // Create a complex filter for video transitions INCLUDING subtitles
-    // This creates seamless cuts between videos, each playing for equal duration
-    const segmentDuration = Math.floor(30 / inputs.videoFiles.length) // Split into equal segments
+    // This creates seamless cuts between videos, using individual shot durations or equal segments
+    
+    // Calculate fallback duration for equal segments if no shot durations provided
+    let fallbackDuration: number | null = null
+    if (!inputs.shotDurations || inputs.shotDurations.length !== inputs.videoFiles.length) {
+      const audioDuration = await this.getAudioDuration(inputs.audioFile)
+      fallbackDuration = Math.floor(audioDuration / inputs.videoFiles.length)
+    }
+    
     const videoProcessing = inputs.videoFiles.map((_, index) => {
       const inputIndex = index + 1 // +1 because input 0 is audio
-      return `[${inputIndex}:v]trim=duration=${segmentDuration},scale=768:1280,setsar=1[v${index}]`
+      
+      // Use individual shot duration if available, otherwise use fallback equal segments
+      const duration = inputs.shotDurations?.[index] || fallbackDuration || 5
+      
+      return `[${inputIndex}:v]trim=duration=${duration},scale=768:1280,setsar=1[v${index}]`
     }).join(';')
     
     const videoConcatenation = inputs.videoFiles.map((_, index) => `[v${index}]`).join('') + 

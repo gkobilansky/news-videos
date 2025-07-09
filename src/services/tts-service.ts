@@ -3,6 +3,7 @@ import { supabaseAdmin } from '../lib/supabase'
 import { Asset } from '../types'
 import fs from 'fs/promises'
 import path from 'path'
+import { PromptRegistry } from '../lib/prompts/prompt-registry'
 
 export class TTSServiceError extends Error {
   constructor(message: string, public code?: string) {
@@ -44,10 +45,21 @@ export class TTSService {
     }
 
     try {
+      // Get TTS configuration from prompt registry
+      const promptConfig = PromptRegistry.getPrompt('TTS_GENERATION')
+      
+      // Validate and prepare script text
+      const scriptText = PromptRegistry.renderPrompt('TTS_GENERATION', { script_text: script })
+      const isValid = PromptRegistry.validateOutput('TTS_GENERATION', scriptText)
+      
+      if (!isValid) {
+        throw new TTSServiceError('Script text is invalid for TTS generation', 'INVALID_SCRIPT')
+      }
+
       const response = await this.openai.audio.speech.create({
-        model: 'tts-1',
+        model: promptConfig.model,
         voice: 'alloy',
-        input: script.trim(),
+        input: scriptText.trim(),
         response_format: 'wav'
       })
 

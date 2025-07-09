@@ -3,6 +3,7 @@ import { supabaseAdmin } from '../lib/supabase'
 import { openai } from '@ai-sdk/openai'
 import { generateText } from 'ai'
 import { z } from 'zod'
+import { PromptRegistry } from '../lib/prompts/prompt-registry'
 
 export class ScriptServiceError extends Error {
   constructor(message: string, public code?: string) {
@@ -17,20 +18,32 @@ export class ScriptService {
    */
   async generateScript(story: Story): Promise<Script> {
     try {
-      // Create RAG prompt
-      const prompt = this.buildScriptPrompt(story)
+      // Get prompt configuration from registry
+      const promptConfig = PromptRegistry.getPrompt('SCRIPT_GENERATION')
+      
+      // Prepare variables for prompt template
+      const sourcesText = story.sources.map((url, i) => `${i + 1}. ${url}`).join('\n')
+      const promptVariables = {
+        headline: story.headline,
+        sources: sourcesText,
+        hot_take: story.hot_take || 'N/A'
+      }
+      
+      // Render prompt from template
+      const prompt = PromptRegistry.renderPrompt('SCRIPT_GENERATION', promptVariables)
       
       // Generate script using OpenAI
       const { text } = await generateText({
-        model: openai('gpt-4o-mini'),
+        model: openai(promptConfig.model),
         prompt,
-        maxTokens: 100,
-        temperature: 0.7,
+        maxTokens: promptConfig.maxTokens,
+        temperature: promptConfig.temperature,
       })
 
-      // Validate script length (≤50 words recommended)
-      const wordCount = text.trim().split(/\s+/).length
-      if (wordCount > 50) {
+      // Validate script using prompt registry
+      const isValid = PromptRegistry.validateOutput('SCRIPT_GENERATION', text.trim())
+      if (!isValid) {
+        const wordCount = text.trim().split(/\s+/).length
         console.warn(`⚠️  Generated script is longer than recommended: ${wordCount} words (recommended max 50)`)
       }
 
@@ -76,69 +89,38 @@ export class ScriptService {
     const sourcesContent = await this.fetchSourcesContent(story.sources)
 
     try {
+      // Get prompt configuration from registry
+      const promptConfig = PromptRegistry.getPrompt('STORYBOARD_GENERATION')
+      
+      // Prepare variables for prompt template
+      const sourcesText = story.sources.map((url, index) => `${index}: ${url}`).join('\n')
+      const sourceContentText = sourcesContent.length > 0 
+        ? 'SOURCE CONTENT:\n' + sourcesContent.map((content, i) => `${i + 1}. ${content.title || 'Source'}: ${content.content.substring(0, 200)}...`).join('\n')
+        : ''
+      
+      const promptVariables = {
+        headline: story.headline,
+        hot_take: story.hot_take || 'N/A',
+        script_text: script.text,
+        sources: sourcesText,
+        source_content: sourceContentText
+      }
+      
+      // Render prompt from template
+      const userPrompt = PromptRegistry.renderPrompt('STORYBOARD_GENERATION', promptVariables)
+      const systemMessage = PromptRegistry.getSystemMessage('STORYBOARD_GENERATION')
+      
       const { text } = await generateText({
-        model: openai('gpt-4o-mini'),
-        temperature: 0.7,
+        model: openai(promptConfig.model),
+        temperature: promptConfig.temperature,
         messages: [
           {
             role: 'system',
-            content: `You are a professional video storyboard creator specializing in news content for Runway ML Gen-4.
-
-CRITICAL WORKFLOW REQUIREMENTS:
-1. Split the script into 2-3 logical beats/segments
-2. Create ONE shot per beat (2-3 shots total)
-3. Each shot should be 5-10 seconds (total video 10-15 seconds)
-4. Use motion-centric, action-focused prompts
-5. Avoid negatives and conversational fluff
-6. Include presenter/anchor references for consistency
-
-SHOT DISTRIBUTION STRATEGY:
-- 2 shots: Establishing shot + Close-up/detail shot
-- 3 shots: Wide establishing + Medium focus + Close resolution
-
-PROMPT STYLE GUIDE:
-✅ Good: "handheld camera follows presenter walking through newsroom"
-✅ Good: "dolly-in on anchor gesturing at data visualization"
-✅ Good: "dynamic pan across breaking news graphics"
-❌ Avoid: "don't show sad faces"
-❌ Avoid: "the anchor is talking about..."
-
-REFERENCE IMAGES:
-- Use @anchor tag in prompts for presenter consistency
-- Include camera movements and angles
-- Focus on visual storytelling, not dialogue
-
-Return a JSON object with this exact structure:
-{
-  "model": "gen4_turbo",
-  "ratio": "768:1280",
-  "shots": [
-    {
-      "promptText": "motion-centric action description with @anchor tag",
-      "duration": 5,
-      "camera": {
-        "movement": "dolly-in|dolly-out|pan-left|pan-right|handheld|static|zoom-in|zoom-out",
-        "angle": "eye-level|low-angle|high-angle|bird-eye|worm-eye"
-      }
-    }
-  ],
-  "fps": 24,
-  "output_format": "mp4"
-}`
+            content: systemMessage
           },
           {
             role: 'user',
-            content: `Create a storyboard for this news story:
-
-HEADLINE: ${story.headline}
-HOT TAKE: ${story.hot_take || 'N/A'}
-SCRIPT TO SPLIT: "${script.text}"
-
-SOURCES: ${story.sources.map((url, index) => `${index}: ${url}`).join('\n')}
-
-${sourcesContent.length > 0 ? 'SOURCE CONTENT:\n' + sourcesContent.map((content, i) => `${i + 1}. ${content.title || 'Source'}: ${content.content.substring(0, 200)}...`).join('\n') : ''}
-
-Split the script into logical beats and create 2-3 dynamic shots that bring this news story to life. Each shot should advance the narrative and use engaging camera work.`
+            content: userPrompt
           }
         ]
       })
@@ -169,6 +151,12 @@ Split the script into logical beats and create 2-3 dynamic shots that bring this
         
         console.log('🎬 Generated storyboard JSON:', jsonText.substring(0, 200) + '...')
         storyboardData = JSON.parse(jsonText)
+        
+        // Validate storyboard using prompt registry
+        const isValid = PromptRegistry.validateOutput('STORYBOARD_GENERATION', storyboardData)
+        if (!isValid) {
+          throw new ScriptServiceError('Generated storyboard does not meet validation requirements', 'VALIDATION_ERROR')
+        }
         
         // Verify it has the expected structure
         if (!storyboardData.shots || !Array.isArray(storyboardData.shots)) {
@@ -515,33 +503,6 @@ Split the script into logical beats and create 2-3 dynamic shots that bring this
     }
   }
 
-  /**
-   * Builds the RAG prompt for script generation
-   */
-  private buildScriptPrompt(story: Story): string {
-    const sourcesText = story.sources.map((url, i) => `${i + 1}. ${url}`).join('\n')
-    
-    let prompt = `Create a 10-15 second video script for a vertical newsbite format.
-
-Requirements:
-- 50 words maximum
-- Engaging, punchy delivery for social media
-- Focus on the key impact or significance
-- Written for voice-over narration
-
-Headline: ${story.headline}
-
-Sources:
-${sourcesText}`
-
-    if (story.hot_take) {
-      prompt += `\n\nHot Take: ${story.hot_take}`
-    }
-
-    prompt += `\n\nGenerate only the script text, no additional formatting or explanations.`
-
-    return prompt
-  }
 
   /**
    * Adds a new shot to the end of an existing storyboard

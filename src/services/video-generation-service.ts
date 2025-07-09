@@ -37,7 +37,7 @@ export class VideoGenerationService {
     })
   }
 
-  async generateVideoFromStoryboard(storyId: string, storyboard: any, takeNumber?: number): Promise<VideoGenerationResult> {
+  async generateVideoFromStoryboard(storyId: string, storyboard: any, takeNumber?: number, model: string = 'gen3a_turbo'): Promise<VideoGenerationResult> {
     if (!storyId || !storyId.trim()) {
       throw new VideoGenerationServiceError('Story ID is required', 'INVALID_STORY_ID')
     }
@@ -64,8 +64,8 @@ export class VideoGenerationService {
 
       // Build the storyboard request with optimized prompts
       const storyboardRequest = {
-        model: storyboard.model || 'gen4_turbo',
-        ratio: storyboard.ratio || '768:1280', // Portrait format - using valid ratio
+        model: model || 'gen3a_turbo',
+        ratio: storyboard.ratio || '768:1280', // Portrait format - using valid ratio for both models
         shots: storyboard.shots.map((shot: any, index: number) => ({
           promptText: shot.promptText,
           duration: shot.duration || 5,
@@ -403,7 +403,7 @@ export class VideoGenerationService {
     }
   }
 
-  private async createVideoFromImageTask(imagePathOrUrl: string, prompt: string, retryCount: number = 0): Promise<RunwayTask> {
+  private async createVideoFromImageTask(imagePathOrUrl: string, prompt: string, model: string = 'gen3a_turbo', retryCount: number = 0): Promise<RunwayTask> {
     const maxRetries = 3
     
     try {
@@ -424,11 +424,11 @@ export class VideoGenerationService {
 
       const task = await this.runway.imageToVideo
         .create({
-          model: 'gen4_turbo', // Use Gen-4 for consistency
+          model: model,
           promptText: prompt,
           promptImage: promptImage,
           duration: 10,
-          ratio: '720:1280' // Portrait format - using valid Gen-4 ratio consistently
+          ratio: '768:1280' // Portrait format - using valid ratio for both models
         })
         .waitForTaskOutput({
           timeout: this.POLLING_TIMEOUT_MS
@@ -443,6 +443,13 @@ export class VideoGenerationService {
     } catch (error: any) {
       if (process.env.NODE_ENV !== 'test') {
         console.error(`❌ Video generation task failed (attempt ${retryCount + 1}/${maxRetries + 1}):`, error)
+        console.error('Error details:', {
+          message: error.message,
+          code: error.code,
+          status: error.status,
+          statusText: error.statusText,
+          stack: error.stack
+        })
       }
       
       if (error instanceof TaskFailedError) {
@@ -450,7 +457,7 @@ export class VideoGenerationService {
         if (error.message.includes('An unexpected error occurred') && retryCount < maxRetries) {
           console.log(`🔄 Retrying video generation in 5 seconds... (attempt ${retryCount + 2}/${maxRetries + 1})`)
           await new Promise(resolve => setTimeout(resolve, 5000)) // Wait 5 seconds
-          return this.createVideoFromImageTask(imagePathOrUrl, prompt, retryCount + 1)
+          return this.createVideoFromImageTask(imagePathOrUrl, prompt, model, retryCount + 1)
         }
         
         throw new VideoGenerationServiceError(
@@ -515,7 +522,7 @@ export class VideoGenerationService {
           
           // Generate video from the existing local image
           console.log(`🎬 Generating video from existing image for shot ${shotIndex}...`)
-          const videoTask = await this.createVideoFromImageTask(localImagePath, shot.promptText)
+          const videoTask = await this.createVideoFromImageTask(localImagePath, shot.promptText, storyboardRequest.model)
           
           if (!videoTask.output || videoTask.output.length === 0) {
             throw new VideoGenerationServiceError(`No video generated for shot ${shotIndex}`, 'NO_VIDEO_OUTPUT')

@@ -450,7 +450,25 @@ describe('FFmpegService', () => {
   })
 
   describe('buildFFmpegCommand', () => {
-    it('should build correct ffmpeg command with single video file', () => {
+    it('should build correct ffmpeg command with single video file', async () => {
+      // Mock audio duration process for getAudioDuration
+      const mockAudioDurationProcess = {
+        stderr: { 
+          on: jest.fn((event, callback) => {
+            if (event === 'data') {
+              callback(Buffer.from('Duration: 00:00:10.50, start: 0.000000'))
+            }
+          })
+        },
+        on: jest.fn((event, callback) => {
+          if (event === 'close') {
+            setTimeout(() => callback(0), 5)
+          }
+        })
+      }
+      
+      mockSpawn.mockReturnValue(mockAudioDurationProcess as any)
+      
       const inputs = {
         audioFile: 'assets/audio/story-123.wav',
         videoFiles: ['assets/video/story-123.mp4'],
@@ -458,7 +476,7 @@ describe('FFmpegService', () => {
       }
       const outputFile = 'output/story-123.mp4'
 
-      const command = (ffmpegService as any).buildFFmpegCommand(inputs, outputFile)
+      const command = await (ffmpegService as any).buildFFmpegCommand(inputs, outputFile)
 
       expect(command).toEqual([
         '-i', 'assets/audio/story-123.wav',
@@ -479,7 +497,25 @@ describe('FFmpegService', () => {
       expect(command).not.toContain('-filter_complex')
     })
 
-    it('should build correct ffmpeg command with multiple video files', () => {
+    it('should build correct ffmpeg command with multiple video files', async () => {
+      // Mock audio duration process for getAudioDuration
+      const mockAudioDurationProcess = {
+        stderr: { 
+          on: jest.fn((event, callback) => {
+            if (event === 'data') {
+              callback(Buffer.from('Duration: 00:00:10.50, start: 0.000000'))
+            }
+          })
+        },
+        on: jest.fn((event, callback) => {
+          if (event === 'close') {
+            setTimeout(() => callback(0), 5)
+          }
+        })
+      }
+      
+      mockSpawn.mockReturnValue(mockAudioDurationProcess as any)
+      
       const inputs = {
         audioFile: 'assets/audio/story-123.wav',
         videoFiles: [
@@ -490,7 +526,7 @@ describe('FFmpegService', () => {
       }
       const outputFile = 'output/story-123.mp4'
 
-      const command = (ffmpegService as any).buildFFmpegCommand(inputs, outputFile)
+      const command = await (ffmpegService as any).buildFFmpegCommand(inputs, outputFile)
 
       // Should contain inputs for all video files
       expect(command).toContain('-i')
@@ -513,7 +549,25 @@ describe('FFmpegService', () => {
       expect(command).not.toContain('-vf')
     })
 
-    it('should build valid filter_complex syntax for multiple video files', () => {
+    it('should build valid filter_complex syntax for multiple video files', async () => {
+      // Mock audio duration process for getAudioDuration
+      const mockAudioDurationProcess = {
+        stderr: { 
+          on: jest.fn((event, callback) => {
+            if (event === 'data') {
+              callback(Buffer.from('Duration: 00:00:10.50, start: 0.000000'))
+            }
+          })
+        },
+        on: jest.fn((event, callback) => {
+          if (event === 'close') {
+            setTimeout(() => callback(0), 5)
+          }
+        })
+      }
+      
+      mockSpawn.mockReturnValue(mockAudioDurationProcess as any)
+      
       const inputs = {
         audioFile: 'assets/audio/story-123.wav',
         videoFiles: [
@@ -524,7 +578,7 @@ describe('FFmpegService', () => {
       }
       const outputFile = 'output/story-123.mp4'
 
-      const command = (ffmpegService as any).buildFFmpegCommand(inputs, outputFile)
+      const command = await (ffmpegService as any).buildFFmpegCommand(inputs, outputFile)
 
       // Find the filter_complex argument
       const filterComplexIndex = command.indexOf('-filter_complex')
@@ -546,14 +600,32 @@ describe('FFmpegService', () => {
       expect(filterComplex).not.toMatch(/\[1:v\]duration=/)
       expect(filterComplex).not.toMatch(/\[2:v\]duration=/)
       
-      // Should calculate proper segment duration (30 seconds / 2 videos = 15 seconds each)
-      expect(filterComplex).toContain('trim=duration=15')
+      // Should calculate proper segment duration (10.5 seconds / 2 videos = 5.25 → Math.floor = 5 seconds each)
+      expect(filterComplex).toContain('trim=duration=5')
       
       // Should NOT have separate -vf filter for multiple video files
       expect(command).not.toContain('-vf')
     })
 
-    it('should handle different numbers of video files correctly', () => {
+    it('should handle different numbers of video files correctly', async () => {
+      // Mock audio duration process for getAudioDuration
+      const mockAudioDurationProcess = {
+        stderr: { 
+          on: jest.fn((event, callback) => {
+            if (event === 'data') {
+              callback(Buffer.from('Duration: 00:00:10.50, start: 0.000000'))
+            }
+          })
+        },
+        on: jest.fn((event, callback) => {
+          if (event === 'close') {
+            setTimeout(() => callback(0), 5)
+          }
+        })
+      }
+      
+      mockSpawn.mockReturnValue(mockAudioDurationProcess as any)
+      
       const inputs = {
         audioFile: 'assets/audio/story-123.wav',
         videoFiles: [
@@ -565,13 +637,13 @@ describe('FFmpegService', () => {
       }
       const outputFile = 'output/story-123.mp4'
 
-      const command = (ffmpegService as any).buildFFmpegCommand(inputs, outputFile)
+      const command = await (ffmpegService as any).buildFFmpegCommand(inputs, outputFile)
 
       const filterComplexIndex = command.indexOf('-filter_complex')
       const filterComplex = command[filterComplexIndex + 1]
       
-      // Should have 3 video inputs with proper duration (30/3 = 10 seconds each)
-      expect(filterComplex).toContain('trim=duration=10')
+      // Should have 3 video inputs with proper duration (10.5/3 = 3.5 → Math.floor = 3 seconds each)
+      expect(filterComplex).toContain('trim=duration=3')
       expect(filterComplex).toMatch(/\[v0\]\[v1\]\[v2\]concat=n=3:v=1:a=0\[concat\]/)
       
       // Should have all 3 video streams
@@ -584,6 +656,57 @@ describe('FFmpegService', () => {
       
       // Should NOT have separate -vf filter for multiple video files
       expect(command).not.toContain('-vf')
+    })
+    
+    it('should use individual shot durations when provided', async () => {
+      // Mock audio duration process for getAudioDuration
+      const mockAudioDurationProcess = {
+        stderr: { 
+          on: jest.fn((event, callback) => {
+            if (event === 'data') {
+              callback(Buffer.from('Duration: 00:00:10.50, start: 0.000000'))
+            }
+          })
+        },
+        on: jest.fn((event, callback) => {
+          if (event === 'close') {
+            setTimeout(() => callback(0), 5)
+          }
+        })
+      }
+      
+      mockSpawn.mockReturnValue(mockAudioDurationProcess as any)
+      
+      const inputs = {
+        audioFile: 'assets/audio/story-123.wav',
+        videoFiles: [
+          'assets/video/story-123-shot1.mp4',
+          'assets/video/story-123-shot2.mp4',
+          'assets/video/story-123-shot3.mp4'
+        ],
+        captionFile: 'assets/captions/story-123.srt',
+        shotDurations: [5, 10, 5] // Individual shot durations
+      }
+      const outputFile = 'output/story-123.mp4'
+
+      const command = await (ffmpegService as any).buildFFmpegCommand(inputs, outputFile)
+
+      // Find the filter_complex argument
+      const filterComplexIndex = command.indexOf('-filter_complex')
+      const filterComplex = command[filterComplexIndex + 1]
+      
+      // Should use individual shot durations instead of equal segments
+      expect(filterComplex).toContain('trim=duration=5') // Shot 1: 5 seconds
+      expect(filterComplex).toContain('trim=duration=10') // Shot 2: 10 seconds
+      expect(filterComplex).toMatch(/\[3:v\]trim=duration=5/) // Shot 3: 5 seconds
+      
+      // Should have all 3 video streams
+      expect(filterComplex).toContain('[v0]')
+      expect(filterComplex).toContain('[v1]')
+      expect(filterComplex).toContain('[v2]')
+      
+      // Should have concatenation for 3 clips
+      expect(filterComplex).toMatch(/\[v0\]\[v1\]\[v2\]concat=n=3:v=1:a=0\[concat\]/)
     })
   })
 

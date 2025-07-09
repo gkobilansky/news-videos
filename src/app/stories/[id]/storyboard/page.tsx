@@ -20,7 +20,7 @@ export default async function StoryboardPage({ params }: PageProps) {
   const { story, storyboard } = result
 
   // Load existing images if storyboard exists
-  let initialImages = []
+  let initialImages: any[] = []
   if (storyboard) {
     try {
       const imagesResult = await getStoryImageAssetsAction(id)

@@ -36,12 +36,12 @@ export async function generateVideoFromStoryboardAction(storyId: string): Promis
   }
 }
 
-export async function generateAdditionalVideoAction(storyId: string): Promise<
+export async function generateAdditionalVideoAction(storyId: string, model: string = 'gen3a_turbo'): Promise<
   | { success: true; video: Video }
   | { success: false; error: string }
 > {
   try {
-    const video = await videoOrchestrationService.generateAdditionalVideoForStory(storyId)
+    const video = await videoOrchestrationService.generateAdditionalVideoForStory(storyId, model)
     return { success: true, video }
   } catch (error) {
     console.error('Additional video generation action failed:', error)

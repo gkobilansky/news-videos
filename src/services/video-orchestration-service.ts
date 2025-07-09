@@ -5,6 +5,7 @@ import { ttsService } from './tts-service'
 import { videoGenerationService } from './video-generation-service'
 import { ffmpegService } from './ffmpeg-service'
 import { videoService } from './video-service'
+import { PromptRegistry } from '../lib/prompts/prompt-registry'
 
 export class VideoOrchestrationServiceError extends Error {
   constructor(message: string, public code?: string) {
@@ -114,7 +115,7 @@ export class VideoOrchestrationService {
     }
   }
 
-  async generateAdditionalVideoForStory(storyId: string): Promise<Video> {
+  async generateAdditionalVideoForStory(storyId: string, model: string = 'gen3a_turbo'): Promise<Video> {
     if (!storyId || !storyId.trim()) {
       throw new VideoOrchestrationServiceError('Story ID is required', 'INVALID_STORY_ID')
     }
@@ -164,19 +165,32 @@ export class VideoOrchestrationService {
 
       // 4. Generate video b-roll with AI variation
       console.log(`${this.getStatusMessage('video')} for additional video of story ${storyId}`)
-      const videoFilepaths = await this.generateVideoAssets(storyId, story)
+      const videoFilepaths = await this.generateVideoAssets(storyId, story, model)
       console.log(`🎥 Video assets generated: ${videoFilepaths.length} files`)
 
-      // 5. Assemble final video with ffmpeg
+      // 5. Get storyboard for shot durations if available
+      let shotDurations: number[] | undefined
+      try {
+        const storyboard = await scriptService.getStoryboard(storyId)
+        if (storyboard && storyboard.shots && storyboard.shots.length > 0) {
+          shotDurations = storyboard.shots.map(shot => shot.duration)
+          console.log(`📊 Using storyboard shot durations: ${shotDurations.join(', ')} seconds`)
+        }
+      } catch (error) {
+        console.log(`No storyboard found for shot durations, using equal segments`)
+      }
+      
+      // 6. Assemble final video with ffmpeg
       console.log(`${this.getStatusMessage('assembly')} for additional video of story ${storyId}`)
       const assemblyResult = await ffmpegService.assembleVideo(storyId, {
         audioFilepath: audioAsset.filepath,
         videoFilepath: videoFilepaths,
-        script: script.text
+        script: script.text,
+        shotDurations: shotDurations
       })
       console.log(`🎬 Final video assembled: ${assemblyResult.filepath}`)
 
-      // 6. Create video record in database
+      // 7. Create video record in database
       console.log(`💾 Creating video record in database...`)
       const finalVideo = await videoService.createVideo({
         story_id: storyId,
@@ -224,22 +238,26 @@ export class VideoOrchestrationService {
       stylePrompt = 'Professional news studio with dynamic graphics and modern broadcast setting'
     }
 
-    let fullPrompt = `${basePrompt}. ${stylePrompt}. Professional news broadcast quality, vibrant colors, dynamic camera movement.`
-
-    // Incorporate hot take if available
-    if (story.hot_take && story.hot_take.trim()) {
-      fullPrompt += ` Key theme: ${story.hot_take}`
+    // Use prompt registry for consistent formatting
+    const promptVariables = {
+      base_prompt: basePrompt,
+      style_prompt: stylePrompt,
+      hot_take_context: story.hot_take && story.hot_take.trim() ? ` Key theme: ${story.hot_take}` : ''
     }
-
-    // Ensure prompt is concise for Runway API
-    if (fullPrompt.length > 500) {
-      fullPrompt = fullPrompt.substring(0, 497) + '...'
+    
+    const fullPrompt = PromptRegistry.renderPrompt('VIDEO_GENERATION_CONTEXT', promptVariables)
+    
+    // Validate prompt length
+    const isValid = PromptRegistry.validateOutput('VIDEO_GENERATION_CONTEXT', fullPrompt)
+    if (!isValid) {
+      // Truncate if too long
+      return fullPrompt.substring(0, 497) + '...'
     }
 
     return fullPrompt
   }
 
-  private async generateVideoAssets(storyId: string, story: Story): Promise<string[]> {
+  private async generateVideoAssets(storyId: string, story: Story, model: string = 'gen3a_turbo'): Promise<string[]> {
     // First, try to get storyboard for this story
     let storyboard: Storyboard | null = null
     try {
@@ -251,7 +269,7 @@ export class VideoOrchestrationService {
     if (storyboard) {
       // Use storyboard-based video generation
       console.log('Using storyboard-based video generation with existing reference images...')
-      const videoResult = await videoGenerationService.generateVideoFromStoryboard(storyId, storyboard)
+      const videoResult = await videoGenerationService.generateVideoFromStoryboard(storyId, storyboard, undefined, model)
       
       if (!videoResult) {
         throw new VideoOrchestrationServiceError(

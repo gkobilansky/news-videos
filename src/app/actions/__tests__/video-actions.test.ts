@@ -85,7 +85,7 @@ describe('Video Actions', () => {
       if (result.success) {
         expect(result.video).toEqual(mockVideo)
       }
-      expect(mockVideoOrchestrationService.generateAdditionalVideoForStory).toHaveBeenCalledWith('story-123')
+      expect(mockVideoOrchestrationService.generateAdditionalVideoForStory).toHaveBeenCalledWith('story-123', 'gen3a_turbo')
     })
 
     it('should handle additional video generation errors', async () => {
