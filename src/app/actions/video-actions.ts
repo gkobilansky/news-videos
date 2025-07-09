@@ -4,6 +4,7 @@ import { videoOrchestrationService } from '@/services/video-orchestration-servic
 import { videoService } from '@/services/video-service'
 import { ffmpegService } from '@/services/ffmpeg-service'
 import { storyService } from '@/services/story-service'
+import { scriptService } from '@/services/script-service'
 import { Video } from '@/types'
 import fs from 'fs/promises'
 import path from 'path'
@@ -85,7 +86,7 @@ export async function reassembleVideoAction(storyId: string): Promise<
       return { success: false, error: 'Story not found' }
     }
     
-    const script = await storyService.getLatestScript(storyId)
+    const script = await scriptService.getScript(storyId)
     if (!script) {
       return { success: false, error: 'Script not found' }
     }
