@@ -14,6 +14,7 @@ export function MultiVideoManager({ story, script }: MultiVideoManagerProps) {
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [selectedModel, setSelectedModel] = useState<string>('gen3a_turbo')
 
   const loadVideos = async () => {
     try {
@@ -36,7 +37,7 @@ export function MultiVideoManager({ story, script }: MultiVideoManagerProps) {
     try {
       setGenerating(true)
       setError(null)
-      const result = await generateAdditionalVideoAction(story.id)
+      const result = await generateAdditionalVideoAction(story.id, selectedModel)
       if (result.success) {
         // Add the new video to the list
         setVideos(prev => [result.video, ...prev])
@@ -93,7 +94,7 @@ export function MultiVideoManager({ story, script }: MultiVideoManagerProps) {
         </div>
       )}
 
-      {/* Generate Button */}
+      {/* Model Selection and Generate Button */}
       <div className="mb-8">
         {story.status === 'failed' && (
           <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-4">
@@ -103,6 +104,25 @@ export function MultiVideoManager({ story, script }: MultiVideoManagerProps) {
             </p>
           </div>
         )}
+        
+        {/* Model Selection */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            AI Model
+          </label>
+          <select
+            value={selectedModel}
+            onChange={(e) => setSelectedModel(e.target.value)}
+            disabled={generating || story.status === 'generating'}
+            className="w-full md:w-auto px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+          >
+            <option value="gen3a_turbo">Gen-3 Alpha Turbo (Recommended)</option>
+            <option value="gen4_turbo">Gen-4 Turbo (Beta)</option>
+          </select>
+          <p className="text-xs text-gray-500 mt-1">
+            Gen-3 Alpha Turbo is more stable and cost-effective. Gen-4 Turbo offers higher quality but may have rate limits.
+          </p>
+        </div>
         
         <button
           onClick={handleGenerateAdditionalVideo}
