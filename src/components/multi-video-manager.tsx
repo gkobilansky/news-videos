@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Video, Story, Script } from '@/types'
-import { getVideosForStoryAction, generateAdditionalVideoAction } from '@/app/actions/video-actions'
+import { getVideosForStoryAction, generateAdditionalVideoAction, reassembleVideoAction } from '@/app/actions/video-actions'
 
 interface MultiVideoManagerProps {
   story: Story
@@ -13,6 +13,7 @@ export function MultiVideoManager({ story, script }: MultiVideoManagerProps) {
   const [videos, setVideos] = useState<Video[]>([])
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
+  const [reassembling, setReassembling] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [selectedModel, setSelectedModel] = useState<string>('gen3a_turbo')
 
@@ -48,6 +49,24 @@ export function MultiVideoManager({ story, script }: MultiVideoManagerProps) {
       setError('Failed to generate additional video. Please try again.')
     } finally {
       setGenerating(false)
+    }
+  }
+
+  const handleReassembleVideo = async () => {
+    try {
+      setReassembling(true)
+      setError(null)
+      const result = await reassembleVideoAction(story.id)
+      if (result.success) {
+        // Add the reassembled video to the list
+        setVideos(prev => [result.video, ...prev])
+      } else {
+        setError(result.error)
+      }
+    } catch (err) {
+      setError('Failed to reassemble video. Please try again.')
+    } finally {
+      setReassembling(false)
     }
   }
 
@@ -124,34 +143,63 @@ export function MultiVideoManager({ story, script }: MultiVideoManagerProps) {
           </p>
         </div>
         
-        <button
-          onClick={handleGenerateAdditionalVideo}
-          disabled={generating || story.status === 'generating'}
-          className={`px-6 py-3 rounded-lg font-medium transition-colors ${
-            generating || story.status === 'generating'
-              ? 'bg-gray-400 text-white cursor-not-allowed'
-              : story.status === 'failed'
-              ? 'bg-orange-600 text-white hover:bg-orange-700'
-              : 'bg-blue-600 text-white hover:bg-blue-700'
-          }`}
-        >
-          {generating ? (
-            <span className="flex items-center">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-              Generating Video...
-            </span>
-          ) : videos.length === 0 ? (
-            story.status === 'failed' ? 'Retry Video Generation' : 'Generate First Video'
-          ) : (
-            story.status === 'failed' ? 'Try Again' : 'Generate Another Video'
-          )}
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={handleGenerateAdditionalVideo}
+            disabled={generating || story.status === 'generating' || reassembling}
+            className={`px-6 py-3 rounded-lg font-medium transition-colors ${
+              generating || story.status === 'generating' || reassembling
+                ? 'bg-gray-400 text-white cursor-not-allowed'
+                : story.status === 'failed'
+                ? 'bg-orange-600 text-white hover:bg-orange-700'
+                : 'bg-blue-600 text-white hover:bg-blue-700'
+            }`}
+          >
+            {generating ? (
+              <span className="flex items-center">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                Generating Video...
+              </span>
+            ) : videos.length === 0 ? (
+              story.status === 'failed' ? 'Retry Video Generation' : 'Generate First Video'
+            ) : (
+              story.status === 'failed' ? 'Try Again' : 'Generate Another Video'
+            )}
+          </button>
+          
+          <button
+            onClick={handleReassembleVideo}
+            disabled={generating || story.status === 'generating' || reassembling}
+            className={`px-6 py-3 rounded-lg font-medium transition-colors ${
+              generating || story.status === 'generating' || reassembling
+                ? 'bg-gray-400 text-white cursor-not-allowed'
+                : 'bg-green-600 text-white hover:bg-green-700'
+            }`}
+            title="Reassemble video from existing assets without making new AI calls"
+          >
+            {reassembling ? (
+              <span className="flex items-center">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                Reassembling...
+              </span>
+            ) : (
+              '🔄 Reassemble Video'
+            )}
+          </button>
+        </div>
         
         {story.status === 'generating' && (
           <p className="text-sm text-yellow-600 mt-2">
             Another video is currently being generated for this story. Please wait.
           </p>
         )}
+        
+        <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <p className="text-sm text-blue-800">
+            <strong>💡 Reassemble Video:</strong> Use this to test video assembly with existing assets (audio, video, script) 
+            without making new AI calls. Perfect for testing caption generation or FFmpeg changes.
+          </p>
+        </div>
       </div>
 
       {/* Videos List */}

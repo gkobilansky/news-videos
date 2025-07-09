@@ -2,7 +2,11 @@
 
 import { videoOrchestrationService } from '@/services/video-orchestration-service'
 import { videoService } from '@/services/video-service'
+import { ffmpegService } from '@/services/ffmpeg-service'
+import { storyService } from '@/services/story-service'
 import { Video } from '@/types'
+import fs from 'fs/promises'
+import path from 'path'
 
 export async function generateVideoAction(storyId: string): Promise<
   | { success: true; video: Video }
@@ -64,6 +68,94 @@ export async function getVideosForStoryAction(storyId: string): Promise<
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to get videos for story'
+    }
+  }
+}
+
+export async function reassembleVideoAction(storyId: string): Promise<
+  | { success: true; video: Video }
+  | { success: false; error: string }
+> {
+  try {
+    console.log(`🎬 Starting video reassembly for story: ${storyId}`)
+    
+    // Get the story and script
+    const story = await storyService.getStory(storyId)
+    if (!story) {
+      return { success: false, error: 'Story not found' }
+    }
+    
+    const script = await storyService.getLatestScript(storyId)
+    if (!script) {
+      return { success: false, error: 'Script not found' }
+    }
+    
+    // Find existing assets
+    const assetsPath = path.join(process.cwd(), 'assets')
+    const audioPath = path.join(assetsPath, 'audio', `${storyId}.wav`)
+    const videoPath = path.join(assetsPath, 'video')
+    
+    // Check if audio exists
+    try {
+      await fs.access(audioPath)
+    } catch {
+      return { success: false, error: 'Audio file not found. Please generate video normally first.' }
+    }
+    
+    // Find video files
+    let videoFiles: string[] = []
+    try {
+      const allVideoFiles = await fs.readdir(videoPath)
+      
+      // Look for storyboard shots first (newer format)
+      const storyboardShots = allVideoFiles
+        .filter(file => file.startsWith(`${storyId}-storyboard-shot`) && file.endsWith('.mp4'))
+        .sort()
+        .map(file => path.join(videoPath, file))
+      
+      if (storyboardShots.length > 0) {
+        videoFiles = storyboardShots
+      } else {
+        // Look for legacy single video files
+        const singleVideoFiles = allVideoFiles
+          .filter(file => file.startsWith(storyId) && file.endsWith('.mp4') && !file.includes('-storyboard-'))
+          .map(file => path.join(videoPath, file))
+        
+        if (singleVideoFiles.length > 0) {
+          videoFiles = [singleVideoFiles[0]] // Use first one
+        }
+      }
+    } catch (error) {
+      return { success: false, error: 'Error reading video directory' }
+    }
+    
+    if (videoFiles.length === 0) {
+      return { success: false, error: 'No video files found. Please generate video normally first.' }
+    }
+    
+    console.log(`📦 Found ${videoFiles.length} video files and audio file`)
+    
+    // Prepare assets for FFmpeg service
+    const videoAssemblyAssets = {
+      audioFilepath: audioPath,
+      videoFilepath: videoFiles.length === 1 ? videoFiles[0] : videoFiles,
+      script: script.text
+    }
+    
+    // Reassemble video using FFmpeg service
+    const result = await ffmpegService.assembleVideo(storyId, videoAssemblyAssets)
+    
+    // Create video record in database
+    const video = await ffmpegService.createFinalVideo(storyId, result.filepath, result.durationSec)
+    
+    console.log(`✅ Video reassembly completed: ${result.filepath}`)
+    
+    return { success: true, video }
+  } catch (error) {
+    console.error('Video reassembly action failed:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to reassemble video'
     }
   }
 }
