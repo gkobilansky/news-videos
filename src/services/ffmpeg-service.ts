@@ -288,46 +288,40 @@ export class FFmpegService {
     inputs: { audioFile: string; videoFiles: string[]; captionFile: string; shotDurations?: number[] },
     outputFile: string
   ): Promise<string[]> {
-    // Enhanced subtitle styling optimized for vertical video format (768x1280)
+    // Simplified subtitle styling for better reliability
     const subtitleStyle = [
-      'Fontname=Arial Black',       // Bold, impactful font
-      'Fontsize=18',               // Reduced font size to fit vertical format
-      'PrimaryColour=&Hffffff&',   // Pure white text
-      'SecondaryColour=&H00ffff&', // Cyan secondary color for effects
-      'OutlineColour=&H000000&',   // Black outline
-      'BackColour=&H40000000&',    // Semi-transparent black background (more opaque)
-      'Outline=2',                 // Reduced outline thickness
-      'Shadow=1',                  // Reduced drop shadow
-      'Bold=1',                    // Bold text
-      'ScaleX=100',                // Normal width scaling
-      'ScaleY=100',                // Normal height scaling
-      'Spacing=1',                 // Slightly spaced letters for clarity
-      'MarginV=120',               // Bottom margin optimized for 1280px height
-      'MarginL=40',                // Left margin optimized for 768px width
-      'MarginR=40',                // Right margin optimized for 768px width
-      'Alignment=2',               // Bottom center alignment
-      'BorderStyle=3',             // Box background style
-      'WrapStyle=0'                // No word wrapping (we control chunks)
+      'Fontname=Arial Black',
+      'Fontsize=18',
+      'PrimaryColour=&Hffffff&',
+      'OutlineColour=&H000000&',
+      'BackColour=&H40000000&',
+      'Outline=2',
+      'Bold=1',
+      'MarginV=120',
+      'Alignment=2'
     ].join(',')
 
-    // Handle single video file (backward compatibility)
+    // Normalize path separators for cross-platform compatibility
+    const normalizedCaptionFile = inputs.captionFile.replace(/\\/g, '/')
+
+    // Handle single video file (simpler approach)
     if (inputs.videoFiles.length === 1) {
       return [
         '-i', inputs.audioFile,
         '-i', inputs.videoFiles[0],
-        '-vf', `subtitles=${inputs.captionFile.replace(/\\/g, '/')}:force_style='${subtitleStyle}'`,
+        '-vf', `subtitles='${normalizedCaptionFile}':force_style='${subtitleStyle}'`,
         '-c:v', 'libx264',
         '-c:a', 'aac',
         '-b:v', '2M',
         '-b:a', '128k',
         '-r', '30',
         '-shortest',
-        '-y', // Overwrite output file
+        '-y',
         outputFile
       ]
     }
 
-    // Handle multiple video files with cuts and transitions
+    // Handle multiple video files - separate video processing and subtitle application
     const args = ['-i', inputs.audioFile]
     
     // Add all video inputs
@@ -335,20 +329,16 @@ export class FFmpegService {
       args.push('-i', videoFile)
     })
 
-    // Create a complex filter for video transitions INCLUDING subtitles
-    // This creates seamless cuts between videos, using individual shot durations or equal segments
-    
-    // Calculate fallback duration for equal segments if no shot durations provided
+    // Calculate durations
     let fallbackDuration: number | null = null
     if (!inputs.shotDurations || inputs.shotDurations.length !== inputs.videoFiles.length) {
       const audioDuration = await this.getAudioDuration(inputs.audioFile)
-      fallbackDuration = Math.floor(audioDuration / inputs.videoFiles.length)
+      fallbackDuration = Math.floor(audioDuration / inputs.videoFiles.length / 1000) // Convert to seconds
     }
     
+    // Build filter chain in two stages: video processing, then subtitle overlay
     const videoProcessing = inputs.videoFiles.map((_, index) => {
       const inputIndex = index + 1 // +1 because input 0 is audio
-      
-      // Use individual shot duration if available, otherwise use fallback equal segments
       const duration = inputs.shotDurations?.[index] || fallbackDuration || 5
       
       return `[${inputIndex}:v]trim=duration=${duration},scale=768:1280,setsar=1[v${index}]`
@@ -357,22 +347,23 @@ export class FFmpegService {
     const videoConcatenation = inputs.videoFiles.map((_, index) => `[v${index}]`).join('') + 
       `concat=n=${inputs.videoFiles.length}:v=1:a=0[concat]`
     
-    const subtitlesFilter = `[concat]subtitles=${inputs.captionFile.replace(/\\/g, '/')}:force_style='${subtitleStyle}'[outv]`
+    // Apply subtitles to concatenated video
+    const subtitlesFilter = `[concat]subtitles='${normalizedCaptionFile}':force_style='${subtitleStyle}'[outv]`
     
-    const filterComplex = videoProcessing + ';' + videoConcatenation + ';' + subtitlesFilter
+    const filterComplex = [videoProcessing, videoConcatenation, subtitlesFilter].join(';')
 
     return [
       ...args,
       '-filter_complex', filterComplex,
       '-map', '[outv]',
-      '-map', '0:a', // Use audio from first input (TTS)
+      '-map', '0:a',
       '-c:v', 'libx264',
       '-c:a', 'aac',
       '-b:v', '2M',
       '-b:a', '128k',
       '-r', '30',
       '-shortest',
-      '-y', // Overwrite output file
+      '-y',
       outputFile
     ]
   }
