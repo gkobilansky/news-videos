@@ -4,6 +4,7 @@ import { scriptService } from './script-service'
 import { ttsService } from './tts-service'
 import { videoGenerationService } from './video-generation-service'
 import { ffmpegService } from './ffmpeg-service'
+import { enhancedFFmpegService } from './enhanced-ffmpeg-service'
 import { videoService } from './video-service'
 import { PromptRegistry } from '../lib/prompts/prompt-registry'
 
@@ -15,6 +16,12 @@ export class VideoOrchestrationServiceError extends Error {
 }
 
 export class VideoOrchestrationService {
+  private useEnhancedFFmpeg: boolean = false
+
+  constructor(options: { useEnhancedFFmpeg?: boolean } = {}) {
+    this.useEnhancedFFmpeg = options.useEnhancedFFmpeg ?? false
+  }
+
   async generateVideoForStory(storyId: string): Promise<Video> {
     if (!storyId || !storyId.trim()) {
       throw new VideoOrchestrationServiceError('Story ID is required', 'INVALID_STORY_ID')
@@ -63,14 +70,15 @@ export class VideoOrchestrationService {
       const videoFilepaths = await this.generateVideoAssets(storyId, story)
       console.log(`🎥 Video assets generated: ${videoFilepaths.length} files`)
 
-      // 6. Assemble final video with ffmpeg
+      // 6. Assemble final video with ffmpeg (enhanced or standard)
       console.log(`${this.getStatusMessage('assembly')} for story ${storyId}`)
-      const assemblyResult = await ffmpegService.assembleVideo(storyId, {
+      const selectedFFmpegService = this.useEnhancedFFmpeg ? enhancedFFmpegService : ffmpegService
+      const assemblyResult = await selectedFFmpegService.assembleVideo(storyId, {
         audioFilepath: audioAsset.filepath,
         videoFilepath: videoFilepaths,
         script: script.text
       })
-      console.log(`🎬 Final video assembled: ${assemblyResult.filepath}`)
+      console.log(`🎬 Final video assembled${this.useEnhancedFFmpeg ? ' (enhanced)' : ''}: ${assemblyResult.filepath}`)
 
       // 7. Create video record in database
       console.log(`💾 Creating video record in database...`)
@@ -337,3 +345,4 @@ export class VideoOrchestrationService {
 }
 
 export const videoOrchestrationService = new VideoOrchestrationService()
+export const enhancedVideoOrchestrationService = new VideoOrchestrationService({ useEnhancedFFmpeg: true })

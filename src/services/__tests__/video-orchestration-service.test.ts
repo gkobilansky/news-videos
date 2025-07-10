@@ -1,4 +1,4 @@
-import { VideoOrchestrationService, VideoOrchestrationServiceError } from '../video-orchestration-service'
+import { VideoOrchestrationService, VideoOrchestrationServiceError, enhancedVideoOrchestrationService } from '../video-orchestration-service'
 import { createMockStory, createMockScript, createMockAsset, createMockVideo, createMockStoryboard } from '../../lib/test-utils'
 import { Story, Script } from '../../types'
 
@@ -18,6 +18,12 @@ jest.mock('../video-generation-service', () => ({
 
 jest.mock('../ffmpeg-service', () => ({
   ffmpegService: {
+    assembleVideo: jest.fn(),
+  }
+}))
+
+jest.mock('../enhanced-ffmpeg-service', () => ({
+  enhancedFFmpegService: {
     assembleVideo: jest.fn(),
   }
 }))
@@ -47,6 +53,7 @@ describe('VideoOrchestrationService', () => {
   let mockTTSService: any
   let mockVideoGenerationService: any
   let mockFFmpegService: any
+  let mockEnhancedFFmpegService: any
   let mockStoryService: any
   let mockScriptService: any
 
@@ -57,6 +64,7 @@ describe('VideoOrchestrationService', () => {
     mockTTSService = require('../tts-service').ttsService
     mockVideoGenerationService = require('../video-generation-service').videoGenerationService
     mockFFmpegService = require('../ffmpeg-service').ffmpegService
+    mockEnhancedFFmpegService = require('../enhanced-ffmpeg-service').enhancedFFmpegService
     mockStoryService = require('../story-service').storyService
     mockScriptService = require('../script-service').scriptService
 
@@ -894,6 +902,70 @@ describe('VideoOrchestrationService', () => {
         'story-123',
         mockStoryboard
       )
+
+      expect(result).toEqual(mockFinalVideo)
+    })
+  })
+
+  describe('Enhanced FFmpeg Integration', () => {
+    it('should use enhanced FFmpeg service when configured', async () => {
+      const enhancedService = new VideoOrchestrationService({ useEnhancedFFmpeg: true })
+      
+      const mockStory = createMockStory({
+        id: 'story-123',
+        status: 'editing',
+        headline: 'Test Enhanced Headline'
+      })
+
+      const mockScript = createMockScript({
+        story_id: 'story-123',
+        text: 'Test enhanced script content.'
+      })
+
+      const mockAudioAsset = createMockAsset({
+        kind: 'audio',
+        filepath: 'assets/audio/story-123-enhanced.wav'
+      })
+
+      const mockAssemblyResult = {
+        filepath: 'output/story-123-enhanced.mp4',
+        durationSec: 15
+      }
+
+      const mockFinalVideo = createMockVideo({
+        id: 'final-enhanced',
+        story_id: 'story-123',
+        filepath: 'output/story-123-enhanced.mp4',
+        duration_sec: 15
+      })
+
+      // Mock service calls
+      mockStoryService.getStory.mockResolvedValue(mockStory)
+      mockScriptService.getScript.mockResolvedValue(mockScript)
+      mockTTSService.generateTTSForStory.mockResolvedValue(mockAudioAsset)
+      mockVideoGenerationService.generateVideoForStory.mockResolvedValue(createMockAsset({
+        kind: 'video',
+        filepath: 'assets/video/story-123-enhanced.mp4'
+      }))
+      
+      // Mock enhanced FFmpeg service
+      mockEnhancedFFmpegService.assembleVideo.mockResolvedValue(mockAssemblyResult)
+
+      // Mock video service
+      const mockVideoService = require('../video-service').videoService
+      mockVideoService.createVideo.mockResolvedValue(mockFinalVideo)
+
+      const result = await enhancedService.generateVideoForStory('story-123')
+
+      // Verify enhanced FFmpeg was called instead of regular FFmpeg
+      expect(mockEnhancedFFmpegService.assembleVideo).toHaveBeenCalledWith('story-123', {
+        audioFilepath: 'assets/audio/story-123-enhanced.wav',
+        videoFilepath: ['assets/video/story-123-enhanced.mp4'],
+        script: 'Test enhanced script content.'
+      })
+      
+      // Verify regular FFmpeg was NOT called
+      expect(mockFFmpegService.assembleVideo).not.toHaveBeenCalled()
 
       expect(result).toEqual(mockFinalVideo)
     })
