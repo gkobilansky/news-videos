@@ -16,7 +16,7 @@ Generate professional news videos automatically from headlines and sources using
 
 ### 🎨 Professional Workflow
 1. **Story Creation** - Enter headline, sources, and optional hot take
-2. **Script Generation** - AI generates ≤45-word scripts with source analysis
+2. **Script Generation** - AI generates concise scripts with source analysis
 3. **Storyboard Editing** - Professional editor for camera angles, timing, and prompts
 4. **Video Generation** - Automated 2-3 shot video creation with motion-centric prompts
 5. **Final Assembly** - Captions, audio sync, and MP4 export

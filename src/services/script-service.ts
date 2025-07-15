@@ -40,12 +40,7 @@ export class ScriptService {
         temperature: promptConfig.temperature,
       })
 
-      // Validate script using prompt registry
-      const isValid = PromptRegistry.validateOutput('SCRIPT_GENERATION', text.trim())
-      if (!isValid) {
-        const wordCount = text.trim().split(/\s+/).length
-        console.warn(`⚠️  Generated script is longer than recommended: ${wordCount} words (recommended max 50)`)
-      }
+      // Note: Script length validation removed - no word count restrictions
 
       // Save script to database
       const { data, error } = await supabaseAdmin
@@ -552,11 +547,7 @@ export class ScriptService {
       throw new ScriptServiceError('Invalid story ID format', 'VALIDATION_ERROR')
     }
 
-    // Validate script length (≤50 words recommended)
-    const wordCount = text.trim().split(/\s+/).length
-    if (wordCount > 50) {
-      console.warn(`⚠️  Script is longer than recommended: ${wordCount} words (recommended max 50)`)
-    }
+    // Note: Script length validation removed - no word count restrictions
 
     try {
       // First check if a script exists for this story

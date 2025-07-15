@@ -17,7 +17,7 @@ This is a **Vertical Newsbite Generator** - a self-hosted Next.js application th
 ## Core Data Flow
 
 1. **Story Creation**: User inputs headline, hot take, sources via web UI
-2. **Script Generation**: OpenAI chat completions generate ≤45 word script with RAG prompt
+2. **Script Generation**: OpenAI chat completions generate concise script with RAG prompt
 3. **Asset Generation**: 
    - TTS via OpenAI (`tts-1` model, `alloy_news` voice) → WAV + timestamps
    - Video b-roll via Runway Gen-3/Gen-4 two-step process:
@@ -183,7 +183,7 @@ A generated video file must:
 ### ✅ Recently Completed Features  
 - **User Story U2**: Complete OpenAI script generation with editing interface (`/stories/[id]/script`)
   - AI-powered script generation using `gpt-4o-mini` with specialized RAG prompts
-  - Real-time word count validation (≤45 words for 10-15 second videos)
+  - Real-time word count display for script feedback
   - Script editing interface with save/regenerate functionality
   - Server Actions integration for client-safe database access
   - Comprehensive error handling and loading states

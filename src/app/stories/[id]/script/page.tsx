@@ -102,9 +102,8 @@ export default function ScriptPage() {
     }
   }
 
-  // Calculate word count and validation
+  // Calculate word count
   const wordCount = scriptText.trim() ? scriptText.trim().split(/\s+/).filter(Boolean).length : 0
-  const isValidLength = wordCount <= 45
   const hasChanges = script && script.text.trim() !== scriptText.trim()
 
   if (loading) {
@@ -171,7 +170,7 @@ export default function ScriptPage() {
                 Generate Script with AI
               </h3>
               <p className="text-gray-600 mb-6">
-                Create a 10-15 second script (max 45 words) using OpenAI based on your headline and sources.
+                Create a 10-15 second script using OpenAI based on your headline and sources.
               </p>
               <button
                 onClick={handleGenerateScript}
@@ -187,9 +186,7 @@ export default function ScriptPage() {
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-semibold text-gray-800">Edit Script</h3>
                 <div className="text-sm text-gray-600">
-                  <span className={wordCount > 45 ? 'text-red-600 font-semibold' : ''}>
-                    {wordCount} / 45 words
-                  </span>
+                  <span>{wordCount} words</span>
                 </div>
               </div>
 
@@ -200,16 +197,11 @@ export default function ScriptPage() {
                 className="w-full h-32 p-4 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
 
-              {!isValidLength && (
-                <p className="text-red-600 text-sm mt-2">
-                  Script too long! Please keep it under 45 words for a 10-15 second video.
-                </p>
-              )}
 
               <div className="flex gap-4 mt-6">
                 <button
                   onClick={handleSaveScript}
-                  disabled={saving || !isValidLength || !scriptText.trim()}
+                  disabled={saving || !scriptText.trim()}
                   className="bg-green-600 text-white py-2 px-6 rounded hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
                 >
                   {saving ? 'Saving...' : hasChanges ? 'Save Changes' : 'Save Script'}
@@ -228,7 +220,6 @@ export default function ScriptPage() {
               <div className="mt-4 p-3 bg-gray-100 rounded text-sm">
                 <div>Current word count: {wordCount}</div>
                 <div>Has changes: {hasChanges ? 'Yes' : 'No'}</div>
-                <div>Valid length: {isValidLength ? 'Yes' : 'No'}</div>
                 <div>Script text length: {scriptText.length} characters</div>
                 <div>Original script length: {script?.text?.length || 0} characters</div>
               </div>

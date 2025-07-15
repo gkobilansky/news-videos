@@ -141,14 +141,18 @@ describe('ScriptService', () => {
 
   describe('prompt building', () => {
     it('should build script prompt with story context', () => {
-      const buildMethod = (scriptService as any).buildScriptPrompt.bind(scriptService)
+      const { PromptRegistry } = require('../../lib/prompts/prompt-registry')
       
-      const prompt = buildMethod(mockStory)
+      const prompt = PromptRegistry.renderPrompt('SCRIPT_GENERATION', {
+        headline: mockStory.headline,
+        sources: mockStory.sources.map((s, i) => `${i + 1}. ${s}`).join('\n'),
+        hot_take: mockStory.hot_take || ''
+      })
       
       expect(prompt).toContain('Test Headline')
       expect(prompt).toContain('Test hot take')
       expect(prompt).toContain('https://example.com/source1')
-      expect(prompt).toContain('50 words')
+      expect(prompt).toContain('Concise')
       expect(prompt).toContain('Engaging')
       expect(prompt).toContain('script')
     })

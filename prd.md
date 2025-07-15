@@ -21,7 +21,7 @@ No additional KPIs for MVP.
 | ID     | Story                                                                                                                                                  |
 | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **U1** | *As a creator,* I open `localhost:3000`, click **“New Story”**, enter a headline, 1–2 sentences, and source URLs.                                      |
-| **U2** | *As a creator,* I can review / edit the AI‑drafted ≤45‑word script in the web UI before rendering.                                                     |
+| **U2** | *As a creator,* I can review / edit the AI‑drafted script in the web UI before rendering.                                                     |
 | **U3** | *As a creator,* I hit **Generate Video** and, after processing, see the MP4 path plus a **Download / Open** link pointing to `./output/<storyId>.mp4`. |
 
 CLI helpers (e.g., `pnpm run generate`) remain optional for power users.
@@ -49,7 +49,7 @@ CLI helpers (e.g., `pnpm run generate`) remain optional for power users.
    - `/stories/new` – form with **Headline**, **Hot Take**, **Sources**.
    - `/stories/[id]/script` – textarea for AI draft editing.
 2. **Script Generation (OpenAI AI SDK)**
-   - Server Action or API route calls `openai.chat.completions` with RAG prompt → ≤45 words.
+   - Server Action or API route calls `openai.chat.completions` with RAG prompt → concise script.
 3. **TTS (OpenAI AI SDK)**
    - `openai.audio.speech.create({ model:"tts-1", voice:"alloy_news" })` → WAV + timestamps.
 4. **Visual Asset Generation**

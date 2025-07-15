@@ -38,8 +38,7 @@ export const PROMPTS = {
     template: `Create a 10-15 second video script for a vertical newsbite format.
 
 Requirements:
-- 50 words maximum
-- Engaging, punchy delivery for social media
+- Concise and engaging delivery for social media
 - Focus on the key impact or significance
 - Written for voice-over narration
 
@@ -52,8 +51,7 @@ Hot Take: {{hot_take}}
 
 Generate only the script text, no additional formatting or explanations.`,
     requirements: [
-      "50 words maximum",
-      "Engaging, punchy delivery for social media",
+      "Concise and engaging delivery for social media",
       "Focus on the key impact or significance",
       "Written for voice-over narration"
     ],
@@ -64,8 +62,8 @@ Generate only the script text, no additional formatting or explanations.`,
         { name: "hot_take", type: "string", required: false, description: "User's perspective on the story" }
       ],
       outputFormat: "text",
-      maxOutputLength: 50,
-      validation: (output: string) => output.split(' ').length <= 50
+      maxOutputLength: 500,
+      validation: (output: string) => output.trim().length > 0
     }
   } as PromptConfig,
 

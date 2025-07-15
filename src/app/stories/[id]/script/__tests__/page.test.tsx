@@ -251,7 +251,7 @@ describe('ScriptPage', () => {
       )
     })
 
-    it('should show word count and validation', async () => {
+    it('should show word count', async () => {
       // Arrange
       const mockStory = createMockStory()
       const mockScript = createMockScript({ text: 'This is a test script with exactly ten words here.' })
@@ -267,11 +267,11 @@ describe('ScriptPage', () => {
 
       // Assert
       await waitFor(() => {
-        expect(screen.getByText(/10 \/ 45 words/i)).toBeInTheDocument()
+        expect(screen.getByText(/10 words/i)).toBeInTheDocument()
       })
     })
 
-    it('should show error when script exceeds word limit', async () => {
+    it('should allow long scripts without restrictions', async () => {
       // Arrange
       const mockStory = createMockStory()
       const mockScript = createMockScript({ text: 'Short script' })
@@ -286,15 +286,15 @@ describe('ScriptPage', () => {
       render(<ScriptPage />)
       
       const textarea = await screen.findByDisplayValue('Short script')
-      const longText = 'This is a very long script that exceeds the maximum word limit of forty-five words by including many unnecessary words that would make the video too long for the target duration of ten to fifteen seconds which is the requirement for vertical newsbites and social media posts'
+      const longText = 'This is a very long script that exceeds the previous maximum word limit of forty-five words by including many unnecessary words that would make the video too long for the target duration of ten to fifteen seconds which is the requirement for vertical newsbites and social media posts'
       
       await act(async () => {
         fireEvent.change(textarea, { target: { value: longText } })
       })
 
       // Assert
-      expect(screen.getByText(/script too long/i)).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /save (changes|script)/i })).toBeDisabled()
+      expect(screen.queryByText(/script too long/i)).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /save (changes|script)/i })).not.toBeDisabled()
     })
 
     it('should handle script update errors', async () => {
