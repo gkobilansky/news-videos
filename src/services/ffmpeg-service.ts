@@ -2,8 +2,10 @@ import { supabaseAdmin } from '../lib/supabase'
 import { Video } from '../types'
 import { spawn } from 'child_process'
 import fs from 'fs/promises'
+import * as fsSync from 'fs'
 import path from 'path'
 import { stringifySync } from 'subtitle'
+import OpenAI from 'openai'
 
 export class FFmpegServiceError extends Error {
   constructor(message: string, public code?: string) {
@@ -24,9 +26,36 @@ export interface VideoAssemblyResult {
   durationSec: number
 }
 
+// OpenAI Whisper word-level timestamp interface
+interface WhisperWord {
+  word: string
+  start: number
+  end: number
+}
+
+interface WhisperTranscription {
+  words: WhisperWord[]
+}
+
+interface CaptionChunk {
+  text: string
+  start: number
+  end: number
+}
+
 export class FFmpegService {
   private supabase = supabaseAdmin
   private readonly PROCESS_TIMEOUT_MS = 300000 // 5 minutes
+  private openai: OpenAI | null = null
+
+  constructor() {
+    // Initialize OpenAI if API key is available
+    if (process.env.OPENAI_API_KEY) {
+      this.openai = new OpenAI({
+        apiKey: process.env.OPENAI_API_KEY
+      })
+    }
+  }
 
   async assembleVideo(storyId: string, assets: VideoAssemblyAssets): Promise<VideoAssemblyResult> {
     if (!storyId || !storyId.trim()) {
@@ -62,16 +91,12 @@ export class FFmpegService {
       await this.verifyInputFiles([assets.audioFilepath, ...videoFiles])
       console.log(`✅ All input files verified`)
 
-      // Generate caption file
-      console.log(`📝 Generating caption file...`)
-      const audioDurationMs = await this.getAudioDuration(assets.audioFilepath)
-      console.log(`🔊 Audio duration: ${audioDurationMs}ms (${(audioDurationMs / 1000).toFixed(2)}s)`)
-      
-      const captionFile = await this.generateCaptionFile(
+      // Generate caption file with word-level timestamps from OpenAI Whisper
+      console.log(`📝 Generating captions with OpenAI Whisper word-level timestamps...`)
+      const captionFile = await this.generateCaptionFileWithWhisper(
         storyId,
         assets.script.trim(),
-        assets.audioFilepath,
-        audioDurationMs
+        assets.audioFilepath
       )
       console.log(`📝 Caption file generated: ${captionFile}`)
 
@@ -81,9 +106,6 @@ export class FFmpegService {
         if (captionContent) {
           console.log(`📝 Caption file content (first 300 chars):`)
           console.log(captionContent.substring(0, 300) + '...')
-          
-          const chunks = this.createCaptionChunks(assets.script.trim())
-          console.log(`📊 Caption chunks (${chunks.length}): ${chunks.slice(0, 5).join(' | ')}${chunks.length > 5 ? '...' : ''}`)
         }
       } catch (readError) {
         // Skip logging this error in tests as it's expected when mocking filesystem
@@ -208,35 +230,40 @@ export class FFmpegService {
     }
   }
 
-  private async generateCaptionFile(
+  private async generateCaptionFileWithWhisper(
     storyId: string,
     script: string,
-    audioFilepath: string,
-    audioDurationMs: number
+    audioFilepath: string
   ): Promise<string> {
+    if (!this.openai) {
+      throw new FFmpegServiceError('OpenAI API key not configured', 'OPENAI_NOT_CONFIGURED')
+    }
+
     const captionDir = path.join(process.cwd(), 'assets', 'captions')
     await fs.mkdir(captionDir, { recursive: true })
     
     const captionFile = path.join(captionDir, `${storyId}.srt`)
     
-    // Break script into synchronized chunks (2-word chunks for readability)
-    const chunks = this.createCaptionChunks(script)
+         // Use OpenAI Whisper to get word-level timestamps
+     const transcription = await this.getWhisperTranscription(audioFilepath, script)
     
-    // Create subtitle cues using the subtitle library
-    const cues = chunks.map((chunk, index) => {
-      const timePerChunk = audioDurationMs / chunks.length
-      const startTime = Math.round(index * timePerChunk)
-      const endTime = Math.round((index + 1) * timePerChunk)
-      
-      return {
-        type: 'cue' as const,
-        data: {
-          start: startTime,
-          end: endTime,
-          text: chunk
-        }
-      }
-    })
+         // Create 2-word caption chunks from word-level timestamps for better readability
+     const chunks = this.createCaptionChunksFromWords(transcription.words)
+     
+     // Create subtitle cues using the subtitle library
+     const cues = chunks.map(chunk => {
+       const startTime = Math.round(chunk.start * 1000) // Convert to milliseconds
+       const endTime = Math.round(chunk.end * 1000)
+       
+       return {
+         type: 'cue' as const,
+         data: {
+           start: startTime,
+           end: endTime,
+           text: this.formatCaptionText(chunk.text)
+         }
+       }
+     })
     
     // Generate SRT content using subtitle library (defaults to SRT format)
     const srtContent = stringifySync(cues, { format: 'SRT' })
@@ -244,6 +271,114 @@ export class FFmpegService {
     await fs.writeFile(captionFile, srtContent)
     
     return captionFile
+  }
+
+  private async getWhisperTranscription(audioFilepath: string, script: string): Promise<WhisperTranscription> {
+    if (!this.openai) {
+      throw new FFmpegServiceError('OpenAI API key not configured', 'OPENAI_NOT_CONFIGURED')
+    }
+
+    try {
+      console.log(`🎤 Getting word-level timestamps from OpenAI Whisper...`)
+      
+             const transcription = await this.openai.audio.transcriptions.create({
+         file: fsSync.createReadStream(audioFilepath),
+        model: "whisper-1",
+        response_format: "verbose_json",
+        timestamp_granularities: ["word"],
+        prompt: script // Help Whisper align with known script
+      })
+
+      console.log(`✅ Received ${transcription.words?.length || 0} word-level timestamps from Whisper`)
+      
+      // Convert OpenAI response to our interface
+      return {
+        words: transcription.words || []
+      }
+    } catch (error) {
+      console.warn(`⚠️ OpenAI Whisper failed, falling back to manual timing:`, error)
+      // Fallback to manual timing if Whisper fails
+      return this.generateFallbackTimestamps(script)
+    }
+  }
+
+  private async generateFallbackTimestamps(script: string): Promise<WhisperTranscription> {
+    console.log(`📝 Using fallback manual timing for word-level timestamps`)
+    
+    const words = script.trim().split(/\s+/)
+    const audioDurationMs = 10000 // Default to 10 seconds if we can't get actual duration
+    const timePerWord = audioDurationMs / words.length
+
+    const whisperWords: WhisperWord[] = words.map((word, index) => ({
+      word: word,
+      start: (index * timePerWord) / 1000, // Convert to seconds
+      end: ((index + 1) * timePerWord) / 1000
+    }))
+
+         return { words: whisperWords }
+   }
+
+  private createCaptionChunksFromWords(words: WhisperWord[]): CaptionChunk[] {
+    const chunks: CaptionChunk[] = []
+    
+    if (words.length === 0) return chunks
+    if (words.length === 1) return [{ text: words[0].word, start: words[0].start, end: words[0].end }]
+    if (words.length === 2) return [{ text: words.map(w => w.word).join(' '), start: words[0].start, end: words[1].end }]
+    
+    // Create 2-word chunks for better readability
+    let i = 0
+    while (i < words.length) {
+      const remainingWords = words.length - i
+      
+      if (remainingWords === 1) {
+        // Single word left
+        chunks.push({
+          text: words[i].word,
+          start: words[i].start,
+          end: words[i].end
+        })
+        break
+      } else if (remainingWords === 2) {
+        // Two words left - keep together
+        chunks.push({
+          text: `${words[i].word} ${words[i + 1].word}`,
+          start: words[i].start,
+          end: words[i + 1].end
+        })
+        break
+      } else if (remainingWords === 3) {
+        // Three words left - take 2, then handle the last one
+        chunks.push({
+          text: `${words[i].word} ${words[i + 1].word}`,
+          start: words[i].start,
+          end: words[i + 1].end
+        })
+        i += 2
+      } else {
+        // 4+ words remaining - take 2 words
+        chunks.push({
+          text: `${words[i].word} ${words[i + 1].word}`,
+          start: words[i].start,
+          end: words[i + 1].end
+        })
+        i += 2
+      }
+    }
+
+    return chunks
+  }
+
+  private formatCaptionText(text: string): string {
+    // Enhanced text formatting for better readability
+    // Convert to uppercase for better visibility on mobile
+    const formatted = text.toUpperCase()
+    
+    // Add punctuation emphasis if missing
+    if (!formatted.match(/[.!?]$/)) {
+      return formatted + '.'
+    }
+    
+    return formatted
   }
 
   private createCaptionChunks(script: string): string[] {
@@ -288,17 +423,22 @@ export class FFmpegService {
     inputs: { audioFile: string; videoFiles: string[]; captionFile: string; shotDurations?: number[] },
     outputFile: string
   ): Promise<string[]> {
-    // Simplified subtitle styling for better reliability
+    // Enhanced subtitle styling optimized for vertical video (768x1280)
     const subtitleStyle = [
       'Fontname=Arial Black',
-      'Fontsize=18',
-      'PrimaryColour=&Hffffff&',
-      'OutlineColour=&H000000&',
-      'BackColour=&H40000000&',
-      'Outline=2',
-      'Bold=1',
-      'MarginV=120',
-      'Alignment=2'
+      'Fontsize=32',  // Larger font for mobile viewing
+      'PrimaryColour=&Hffffff&',  // White text
+      'OutlineColour=&H000000&',  // Black outline
+      'BackColour=&H80000000&',   // Semi-transparent black background
+      'Outline=4',                // Thicker outline for better visibility
+      'Shadow=2',                 // Add shadow for depth
+      'Bold=1',                   // Bold text
+      'MarginV=120',              // Bottom margin from edge
+      'MarginL=40',               // Left margin
+      'MarginR=40',               // Right margin
+      'Alignment=2',              // Bottom center alignment
+      'BorderStyle=3',            // Box background style
+      'Spacing=2'                 // Letter spacing for readability
     ].join(',')
 
     // Normalize path separators for cross-platform compatibility

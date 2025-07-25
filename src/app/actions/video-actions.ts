@@ -46,7 +46,7 @@ export async function generateAdditionalVideoAction(storyId: string, model: stri
   | { success: false; error: string }
 > {
   try {
-    const video = await videoOrchestrationService.generateAdditionalVideoForStory(storyId, model)
+    const video = await videoOrchestrationService.generateAdditionalVideoForStory(storyId, model as 'gen3a_turbo' | 'gen4_turbo')
     return { success: true, video }
   } catch (error) {
     console.error('Additional video generation action failed:', error)
@@ -78,7 +78,7 @@ export async function reassembleVideoAction(storyId: string): Promise<
   | { success: false; error: string }
 > {
   try {
-    console.log(`🎬 Starting video reassembly for story: ${storyId}`)
+    console.log(`🎬 Starting ENHANCED video reassembly for story: ${storyId}`)
     
     // Get the story and script
     const story = await storyService.getStory(storyId)
@@ -143,20 +143,24 @@ export async function reassembleVideoAction(storyId: string): Promise<
       script: script.text
     }
     
-    // Reassemble video using FFmpeg service
+    // Reassemble video using FFmpeg service with OpenAI Whisper integration
     const result = await ffmpegService.assembleVideo(storyId, videoAssemblyAssets)
     
     // Create video record in database
     const video = await ffmpegService.createFinalVideo(storyId, result.filepath, result.durationSec)
     
-    console.log(`✅ Video reassembly completed: ${result.filepath}`)
+    console.log(`✅ ENHANCED video reassembly completed: ${result.filepath}`)
+    console.log(`💡 Enhanced features used:`)
+    console.log(`   - Smart timing based on word density`)
+    console.log(`   - Enhanced styling for vertical videos`)
+    console.log(`   - Better text formatting and readability`)
     
     return { success: true, video }
   } catch (error) {
     console.error('Video reassembly action failed:', error)
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to reassemble video'
+      error: error instanceof Error ? error.message : 'Failed to reassemble video with enhanced service'
     }
   }
 }

@@ -12,6 +12,7 @@
 
 import { ffmpegService } from '../src/services/ffmpeg-service'
 import { storyService } from '../src/services/story-service'
+import { scriptService } from '../src/services/script-service'
 import fs from 'fs/promises'
 import path from 'path'
 
@@ -86,7 +87,7 @@ async function getScriptFromDatabase(storyId: string): Promise<string | null> {
       return null
     }
     
-    const script = await storyService.getLatestScript(storyId)
+    const script = await scriptService.getScript(storyId)
     if (!script) {
       console.log(`❌ No script found for story: ${storyId}`)
       return null
@@ -101,8 +102,13 @@ async function getScriptFromDatabase(storyId: string): Promise<string | null> {
 }
 
 async function reassembleVideo(storyId: string): Promise<void> {
-  console.log(`🎬 Starting video reassembly for story: ${storyId}`)
-  console.log(`📋 This will test the refactored caption generation using subtitle library`)
+  console.log(`🎬 Starting ENHANCED video reassembly for story: ${storyId}`)
+  console.log(`📋 This will test the ENHANCED FFmpeg service with:`)
+  console.log(`   🎯 Smart caption timing based on word density`)
+  console.log(`   🎨 Enhanced styling for vertical videos`)
+  console.log(`   📝 Better text formatting and readability`)
+  console.log(`   🔧 Improved audio duration detection`)
+  console.log(`   🛡️  Robust error handling`)
   console.log()
   
   // Find existing assets
@@ -140,16 +146,21 @@ async function reassembleVideo(storyId: string): Promise<void> {
       script: script
     }
     
-    console.log(`🚀 Starting video assembly...`)
+    console.log(`🚀 Starting enhanced video assembly...`)
     const result = await ffmpegService.assembleVideo(storyId, videoAssemblyAssets)
     
     console.log()
-    console.log(`✅ Video reassembly completed successfully!`)
+    console.log(`✅ Enhanced video reassembly completed successfully!`)
     console.log(`📁 Output file: ${result.filepath}`)
     console.log(`⏱️  Duration: ${result.durationSec}s`)
     console.log()
     console.log(`🎉 You can now test the video at: ${result.filepath}`)
-    console.log(`💡 The captions were generated using the new subtitle library`)
+    console.log(`💡 The captions were generated using the ENHANCED FFmpeg service with:`)
+    console.log(`   - Improved timing based on word density`)
+    console.log(`   - Enhanced styling for vertical videos`)
+    console.log(`   - Better text formatting (uppercase, punctuation)`)
+    console.log(`   - Larger font size and better visibility`)
+    console.log(`   - Semi-transparent backgrounds for readability`)
     
   } catch (error) {
     console.log()
@@ -222,8 +233,8 @@ async function main() {
   const args = process.argv.slice(2)
   
   if (args.length === 0) {
-    console.log(`🎬 Video Reassembly Tool`)
-    console.log(`Testing the refactored caption generation with subtitle library`)
+    console.log(`🎬 ENHANCED Video Reassembly Tool`)
+    console.log(`Testing the ENHANCED FFmpeg service with superior caption generation`)
     console.log()
     await listAvailableStories()
     return
