@@ -1,4 +1,4 @@
-import { VideoOrchestrationService, VideoOrchestrationServiceError, enhancedVideoOrchestrationService } from '../video-orchestration-service'
+import { VideoOrchestrationService, VideoOrchestrationServiceError } from '../video-orchestration-service'
 import { createMockStory, createMockScript, createMockAsset, createMockVideo, createMockStoryboard } from '../../lib/test-utils'
 import { Story, Script } from '../../types'
 
@@ -566,32 +566,7 @@ describe('VideoOrchestrationService', () => {
     })
   })
 
-  describe('generateVideoPrompt', () => {
-    it('should generate video prompt from story headline', () => {
-      const story: Story = createMockStory({
-        headline: 'Scientists discover new species in deep ocean',
-        hot_take: 'This could change our understanding of marine life'
-      })
 
-      const prompt = (orchestrationService as any).generateVideoPrompt(story)
-
-      expect(prompt).toContain('Scientists discover new species in deep ocean')
-      expect(prompt).toContain('marine life')
-      expect(prompt).toMatch(/news|breaking|scientific|discovery/i)
-    })
-
-    it('should generate prompt without hot take if not provided', () => {
-      const story: Story = createMockStory({
-        headline: 'Market reaches new highs',
-        hot_take: ''
-      })
-
-      const prompt = (orchestrationService as any).generateVideoPrompt(story)
-
-      expect(prompt).toContain('Market reaches new highs')
-      expect(prompt).toMatch(/news|market|financial/i)
-    })
-  })
 
   describe('getStatusMessage', () => {
     it('should provide appropriate status messages', () => {
@@ -909,7 +884,7 @@ describe('VideoOrchestrationService', () => {
 
   describe('Enhanced FFmpeg Integration', () => {
     it('should use enhanced FFmpeg service when configured', async () => {
-      const enhancedService = new VideoOrchestrationService({ useEnhancedFFmpeg: true })
+      const enhancedService = new VideoOrchestrationService()
       
       const mockStory = createMockStory({
         id: 'story-123',

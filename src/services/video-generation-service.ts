@@ -227,73 +227,7 @@ export class VideoGenerationService {
     }
   }
 
-  async generateVideoForStory(storyId: string, prompt: string): Promise<Asset> {
-    let generatedFilepath: string | null = null
 
-    try {
-      const { videoPath, duration } = await this.generateVideo(storyId, prompt)
-      generatedFilepath = videoPath
-
-      const asset = await this.createVideoAsset(storyId, videoPath, duration)
-      
-      return asset
-    } catch (error) {
-      if (generatedFilepath) {
-        try {
-          await fs.unlink(generatedFilepath)
-        } catch (cleanupError) {
-          if (process.env.NODE_ENV !== 'test') {
-            console.error('Failed to cleanup video file:', cleanupError)
-          }
-        }
-      }
-
-      if (error instanceof VideoGenerationServiceError) {
-        throw error
-      }
-
-      throw new VideoGenerationServiceError(
-        'Failed to generate video for story',
-        'STORY_VIDEO_FAILED'
-      )
-    }
-  }
-
-  async regenerateVideoForStory(storyId: string, prompt: string, takeNumber?: number): Promise<Asset> {
-    let generatedFilepath: string | null = null
-
-    try {
-      // Clean up any existing video assets for this story before regenerating
-      await this.cleanupExistingVideoAssets(storyId)
-
-      // Generate with take number suffix for multiple versions
-      const { videoPath, duration } = await this.generateVideo(storyId, prompt, takeNumber)
-      generatedFilepath = videoPath
-
-      const asset = await this.createVideoAsset(storyId, videoPath, duration)
-      
-      return asset
-    } catch (error) {
-      if (generatedFilepath) {
-        try {
-          await fs.unlink(generatedFilepath)
-        } catch (cleanupError) {
-          if (process.env.NODE_ENV !== 'test') {
-            console.error('Failed to cleanup video file:', cleanupError)
-          }
-        }
-      }
-
-      if (error instanceof VideoGenerationServiceError) {
-        throw error
-      }
-
-      throw new VideoGenerationServiceError(
-        'Failed to regenerate video for story',
-        'STORY_VIDEO_REGENERATION_FAILED'
-      )
-    }
-  }
 
   private async cleanupExistingVideoAssets(storyId: string): Promise<void> {
     try {
@@ -707,7 +641,7 @@ export class VideoGenerationService {
     }
   }
 
-  private getPortraitRatioForModel(model: 'gen3a_turbo' | 'gen4_turbo'): string {
+  private getPortraitRatioForModel(model: 'gen3a_turbo' | 'gen4_turbo'): "720:1280" | "1280:720" | "1104:832" | "832:1104" | "960:960" | "1584:672" | "1280:768" | "768:1280" {
     // Gen-3 Alpha Turbo: 768:1280 (portrait) or 1280:768 (landscape)
     // Gen-4 Turbo: 720:1280, 832:1104 (portrait) or 1280:720, 1584:672, 1104:832 (landscape) or 960:960 (square)
     switch (model) {

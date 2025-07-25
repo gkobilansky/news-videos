@@ -5,7 +5,7 @@ import { ttsService } from './tts-service'
 import { videoGenerationService } from './video-generation-service'
 import { ffmpegService } from './ffmpeg-service'
 import { videoService } from './video-service'
-import { PromptRegistry } from '../lib/prompts/prompt-registry'
+
 
 export class VideoOrchestrationServiceError extends Error {
   constructor(message: string, public code?: string) {
@@ -218,110 +218,57 @@ export class VideoOrchestrationService {
     }
   }
 
-  private generateVideoPrompt(story: Story): string {
-    const basePrompt = `Create a dynamic vertical news video for: ${story.headline}`
-    
-    // Add visual style based on content
-    let stylePrompt = ''
-    const headline = story.headline.toLowerCase()
-    
-    if (headline.includes('tech') || headline.includes('ai') || headline.includes('digital')) {
-      stylePrompt = 'High-tech futuristic environment with digital graphics and modern cityscape'
-    } else if (headline.includes('market') || headline.includes('financial') || headline.includes('economic')) {
-      stylePrompt = 'Professional financial district with charts, graphs, and business imagery'
-    } else if (headline.includes('science') || headline.includes('research') || headline.includes('discovery')) {
-      stylePrompt = 'Scientific laboratory or research facility with modern equipment'
-    } else if (headline.includes('politics') || headline.includes('government') || headline.includes('election')) {
-      stylePrompt = 'Government buildings, official settings, or press conference environment'
-    } else if (headline.includes('climate') || headline.includes('environment') || headline.includes('green')) {
-      stylePrompt = 'Natural environment with focus on sustainability and environmental themes'
-    } else {
-      stylePrompt = 'Professional news studio with dynamic graphics and modern broadcast setting'
-    }
 
-    // Use prompt registry for consistent formatting
-    const promptVariables = {
-      base_prompt: basePrompt,
-      style_prompt: stylePrompt,
-      hot_take_context: story.hot_take && story.hot_take.trim() ? ` Key theme: ${story.hot_take}` : ''
-    }
-    
-    const fullPrompt = PromptRegistry.renderPrompt('VIDEO_GENERATION_CONTEXT', promptVariables)
-    
-    // Validate prompt length
-    const isValid = PromptRegistry.validateOutput('VIDEO_GENERATION_CONTEXT', fullPrompt)
-    if (!isValid) {
-      // Truncate if too long
-      return fullPrompt.substring(0, 497) + '...'
-    }
-
-    return fullPrompt
-  }
 
   private async generateVideoAssets(storyId: string, story: Story, model: 'gen3a_turbo' | 'gen4_turbo' = 'gen3a_turbo'): Promise<string[]> {
-    // First, try to get storyboard for this story
+    // Get storyboard for this story - required for video generation
     let storyboard: Storyboard | null = null
     try {
       storyboard = await scriptService.getStoryboard(storyId)
     } catch (error) {
-      console.log(`No storyboard found for story ${storyId}, using legacy video generation`)
+      throw new VideoOrchestrationServiceError(
+        'No storyboard found for story. Please generate a storyboard first.',
+        'STORYBOARD_REQUIRED'
+      )
     }
 
-    if (storyboard) {
-      // Use storyboard-based video generation
-      console.log('Using storyboard-based video generation with existing reference images...')
-      const videoResult = await videoGenerationService.generateVideoFromStoryboard(storyId, storyboard, undefined, model)
-      
-      if (!videoResult) {
-        throw new VideoOrchestrationServiceError(
-          'Storyboard video generation failed',
-          'VIDEO_GENERATION_FAILED'
-        )
-      }
+    if (!storyboard) {
+      throw new VideoOrchestrationServiceError(
+        'No storyboard found for story. Please generate a storyboard first.',
+        'STORYBOARD_REQUIRED'
+      )
+    }
 
-      // Video generation completed successfully
+    // Use storyboard-based video generation
+    console.log('Using storyboard-based video generation with existing reference images...')
+    const videoResult = await videoGenerationService.generateVideoFromStoryboard(storyId, storyboard, undefined, model)
+    
+    if (!videoResult) {
+      throw new VideoOrchestrationServiceError(
+        'Storyboard video generation failed',
+        'VIDEO_GENERATION_FAILED'
+      )
+    }
 
-      console.log('Storyboard video generation succeeded')
-      console.log(`Successfully generated storyboard video for story ${storyId}`)
+    console.log('Storyboard video generation succeeded')
+    console.log(`Successfully generated storyboard video for story ${storyId}`)
+    
+    if (videoResult.allClips && videoResult.allClips.length > 0) {
+      console.log(`📹 Generated ${videoResult.allClips.length} clips for concatenation:`)
+      videoResult.allClips.forEach((clip, index) => {
+        console.log(`  📄 Clip ${index + 1}: ${clip}`)
+      })
       
-      if (videoResult.allClips && videoResult.allClips.length > 0) {
-        console.log(`📹 Generated ${videoResult.allClips.length} clips for concatenation:`)
-        videoResult.allClips.forEach((clip, index) => {
-          console.log(`  📄 Clip ${index + 1}: ${clip}`)
-        })
-        
-        // Return ALL clips for concatenation
-        return videoResult.allClips
-      } else {
-        console.error('🚨 ERROR: videoResult.allClips is empty or undefined!')
-        console.error('🚨 Falling back to single videoPath:', videoResult.videoPath)
-        return [videoResult.videoPath]
-      }
+      // Return ALL clips for concatenation
+      return videoResult.allClips
     } else {
-      // Fall back to legacy text-based video generation
-      console.log('Using legacy text-based video generation...')
-      const runwayPrompt = this.generateVideoPrompt(story)
-
-      console.log('Attempting video generation with Runway AI...')
-      const videoAsset = await this.generateRunwayVideo(storyId, runwayPrompt)
-
-      if (!videoAsset) {
-        throw new VideoOrchestrationServiceError(
-          'Runway video generation failed',
-          'VIDEO_GENERATION_FAILED'
-        )
-      }
-
-      console.log('Runway video generation succeeded')
-      console.log(`Successfully generated video asset for story ${storyId}`)
-      
-      return [videoAsset.filepath]
+      console.error('🚨 ERROR: videoResult.allClips is empty or undefined!')
+      console.error('🚨 Falling back to single videoPath:', videoResult.videoPath)
+      return [videoResult.videoPath]
     }
   }
 
-  private async generateRunwayVideo(storyId: string, prompt: string): Promise<Asset> {
-    return await videoGenerationService.generateVideoForStory(storyId, prompt)
-  }
+
 
   private getStatusMessage(phase: string): string {
     switch (phase) {

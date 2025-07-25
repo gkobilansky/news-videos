@@ -35,7 +35,7 @@ export const PROMPTS = {
     model: "gpt-4o-mini",
     temperature: 0.7,
     maxTokens: 100,
-    template: `Create a 10-15 second video script for a vertical newsbite format.
+    template: `Create a 15-25 second video script for a vertical newsbite format.
 
 Requirements:
 - Concise and engaging delivery for social media
@@ -62,7 +62,6 @@ Generate only the script text, no additional formatting or explanations.`,
         { name: "hot_take", type: "string", required: false, description: "User's perspective on the story" }
       ],
       outputFormat: "text",
-      maxOutputLength: 500,
       validation: (output: string) => output.trim().length > 0
     }
   } as PromptConfig,
@@ -154,28 +153,7 @@ Split the script into logical beats and create 2-3 dynamic shots that bring this
     }
   } as PromptConfig,
 
-  // Video Generation Context
-  VIDEO_GENERATION_CONTEXT: {
-    version: "1.0.0",
-    model: "runway-gen4",
-    template: `{{base_prompt}}. {{style_prompt}}. Professional news broadcast quality, vibrant colors, dynamic camera movement.{{hot_take_context}}`,
-    requirements: [
-      "Include motion-centric language",
-      "Professional news broadcast quality",
-      "Dynamic camera movement",
-      "Truncate to 500 characters for Runway API"
-    ],
-    metadata: {
-      variables: [
-        { name: "base_prompt", type: "string", required: true, description: "Base shot prompt" },
-        { name: "style_prompt", type: "string", required: true, description: "Visual style based on story keywords" },
-        { name: "hot_take_context", type: "string", required: false, description: "Additional context from hot take" }
-      ],
-      outputFormat: "text",
-      maxOutputLength: 500,
-      validation: (output: string) => output.length <= 500
-    }
-  } as PromptConfig,
+
 
   // TTS Configuration
   TTS_GENERATION: {
@@ -231,7 +209,7 @@ export class PromptRegistry {
 
   static getRequiredVariables(key: PromptKey): PromptVariable[] {
     const prompt = PROMPTS[key]
-    return prompt.metadata?.variables?.filter(v => v.required) || []
+    return prompt.metadata?.variables?.filter((v: PromptVariable) => v.required) || []
   }
 
   static getAllPrompts(): Record<string, PromptConfig> {
