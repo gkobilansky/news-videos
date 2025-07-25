@@ -227,62 +227,6 @@ export class VideoGenerationService {
     }
   }
 
-
-
-  private async cleanupExistingVideoAssets(storyId: string): Promise<void> {
-    try {
-      // Get existing video assets for this story
-      const { data: existingAssets, error } = await this.supabase
-        .from('assets')
-        .select('*')
-        .eq('story_id', storyId)
-        .eq('kind', 'video')
-        .eq('provider', 'runway')
-
-      if (error) {
-        if (process.env.NODE_ENV !== 'test') {
-          console.error('Failed to fetch existing video assets:', error)
-        }
-        return // Don't fail regeneration if cleanup fails
-      }
-
-      if (existingAssets && existingAssets.length > 0) {
-        // Delete files from filesystem
-        for (const asset of existingAssets) {
-          try {
-            const fullPath = path.resolve(process.cwd(), asset.filepath)
-            await fs.unlink(fullPath)
-          } catch (fileError) {
-            if (process.env.NODE_ENV !== 'test') {
-              console.error(`Failed to delete video file ${asset.filepath}:`, fileError)
-            }
-            // Continue with other files
-          }
-        }
-
-        // Delete database records
-        const { error: deleteError } = await this.supabase
-          .from('assets')
-          .delete()
-          .eq('story_id', storyId)
-          .eq('kind', 'video')
-          .eq('provider', 'runway')
-
-        if (deleteError) {
-          if (process.env.NODE_ENV !== 'test') {
-            console.error('Failed to delete existing video asset records:', deleteError)
-          }
-          // Don't fail regeneration if cleanup fails
-        }
-      }
-    } catch (error) {
-      if (process.env.NODE_ENV !== 'test') {
-        console.error('Failed to cleanup existing video assets:', error)
-      }
-      // Don't fail regeneration if cleanup fails
-    }
-  }
-
   private async createImageGenerationTask(prompt: string): Promise<RunwayTask> {
     try {
       console.log(`📸 Creating image generation task with prompt: ${prompt.substring(0, 50)}...`)
