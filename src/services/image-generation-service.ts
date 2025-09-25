@@ -2,7 +2,7 @@ import { supabaseAdmin } from '../lib/supabase'
 import { Asset, StoryboardShot, Storyboard } from '../types'
 import fs from 'fs/promises'
 import path from 'path'
-import { RunwayML, TaskFailedError } from '@runwayml/sdk'
+import OpenAI from 'openai'
 
 export class ImageGenerationServiceError extends Error {
   constructor(message: string, public code?: string) {
@@ -23,24 +23,27 @@ export interface StoryboardImageResult {
   totalGenerated: number
 }
 
-interface RunwayImageTask {
-  id: string
-  status: 'pending' | 'processing' | 'completed' | 'failed'
-  output?: string[]
+interface OpenAIImageResult {
+  url: string
+  revised_prompt?: string
 }
 
 export class ImageGenerationService {
   private supabase = supabaseAdmin
-  private runway: RunwayML
-  private readonly POLLING_TIMEOUT_MS = 300000 // 5 minutes
+  private openai: OpenAI
 
-  constructor() {
-    if (!process.env.RUNWAY_API_KEY) {
-      throw new ImageGenerationServiceError('Runway API key is required', 'MISSING_API_KEY')
+  constructor(openaiClient?: OpenAI) {
+    if (openaiClient) {
+      this.openai = openaiClient
+    } else {
+      if (!process.env.OPENAI_API_KEY) {
+        throw new ImageGenerationServiceError('OpenAI API key is required', 'MISSING_API_KEY')
+      }
+      
+      this.openai = new OpenAI({
+        apiKey: process.env.OPENAI_API_KEY
+      })
     }
-    this.runway = new RunwayML({
-      apiKey: process.env.RUNWAY_API_KEY
-    })
   }
 
   /**
@@ -81,7 +84,7 @@ export class ImageGenerationService {
         .select('*')
         .eq('story_id', storyId)
         .eq('kind', 'image')
-        .eq('provider', 'runway')
+        .eq('provider', 'openai')
         .like('filepath', '%base_presenter%')
         .limit(1)
 
@@ -197,10 +200,10 @@ export class ImageGenerationService {
     }
 
     try {
-      // Create image generation task
-      const imageTask = await this.createImageGenerationTask(shot.promptText)
+      // Generate image using OpenAI DALL-E
+      const imageResult = await this.createImageGenerationTask(shot.promptText)
       
-      if (!imageTask.output || imageTask.output.length === 0) {
+      if (!imageResult.url) {
         throw new ImageGenerationServiceError(`No image generated for shot ${shotIndex}`, 'NO_IMAGE_OUTPUT')
       }
 
@@ -208,7 +211,7 @@ export class ImageGenerationService {
       const filename = filenamePrefix || `shot${shotIndex}`
       const localImagePath = await this.downloadImage(
         storyId, 
-        imageTask.output[0], 
+        imageResult.url, 
         filename,
         1 // Default take number
       )
@@ -223,7 +226,7 @@ export class ImageGenerationService {
 
       return {
         imagePath: localImagePath,
-        imageUrl: imageTask.output[0],
+        imageUrl: imageResult.url,
         asset
       }
 
@@ -255,17 +258,17 @@ export class ImageGenerationService {
     }
 
     try {
-      // Create image generation task
-      const imageTask = await this.createImageGenerationTask(prompt.trim())
+      // Generate image using OpenAI DALL-E
+      const imageResult = await this.createImageGenerationTask(prompt.trim())
       
-      if (!imageTask.output || imageTask.output.length === 0) {
+      if (!imageResult.url) {
         throw new ImageGenerationServiceError('No image generated from prompt', 'NO_IMAGE_OUTPUT')
       }
 
       // Download and store the image locally
       const localImagePath = await this.downloadImage(
         storyId, 
-        imageTask.output[0], 
+        imageResult.url, 
         prefix,
         takeNumber
       )
@@ -279,7 +282,7 @@ export class ImageGenerationService {
 
       return {
         imagePath: localImagePath,
-        imageUrl: imageTask.output[0],
+        imageUrl: imageResult.url,
         asset
       }
 
@@ -335,7 +338,7 @@ export class ImageGenerationService {
         .select('*')
         .eq('story_id', storyId)
         .eq('kind', 'image')
-        .eq('provider', 'runway')
+        .eq('provider', 'openai')
         .order('created_at', { ascending: true })
 
       if (error) {
@@ -368,7 +371,7 @@ export class ImageGenerationService {
         .insert({
           story_id: storyId,
           kind: 'image',
-          provider: 'runway',
+          provider: 'openai',
           filepath: relativePath,
           metadata
         })
@@ -405,12 +408,10 @@ export class ImageGenerationService {
         .select('*')
         .eq('story_id', storyId)
         .eq('kind', 'image')
-        .eq('provider', 'runway')
+        .eq('provider', 'openai')
 
       if (error) {
-        if (process.env.NODE_ENV !== 'test') {
-          console.error('Failed to fetch existing image assets:', error)
-        }
+        console.error('Failed to fetch existing image assets:', error)
         return // Don't fail regeneration if cleanup fails
       }
 
@@ -434,7 +435,7 @@ export class ImageGenerationService {
           .delete()
           .eq('story_id', storyId)
           .eq('kind', 'image')
-          .eq('provider', 'runway')
+          .eq('provider', 'openai')
 
         if (deleteError) {
           if (process.env.NODE_ENV !== 'test') {
@@ -452,54 +453,49 @@ export class ImageGenerationService {
   }
 
   /**
-   * Create image generation task using Runway ML
+   * Create image generation task using OpenAI DALL-E
    */
-  private async createImageGenerationTask(prompt: string): Promise<RunwayImageTask> {
+  private async createImageGenerationTask(prompt: string): Promise<OpenAIImageResult> {
     try {
       console.log(`📸 Creating image generation task with prompt: ${prompt.substring(0, 50)}...`)
       
-      const task = await this.runway.textToImage
-        .create({
-          model: 'gen4_image',
-          promptText: prompt,
-          ratio: '720:1280' // Portrait format - using valid Gen-4 ratio
-        })
-        .waitForTaskOutput({
-          timeout: this.POLLING_TIMEOUT_MS
-        })
+      const response = await this.openai.images.generate({
+        model: 'dall-e-3',
+        prompt: prompt,
+        size: '1024x1792', // Portrait format for vertical videos
+        quality: 'standard',
+        n: 1,
+        response_format: 'url'
+      })
 
-      console.log(`✅ Image generation task completed: ${task.id}`)
+      if (!response.data || response.data.length === 0) {
+        throw new ImageGenerationServiceError('No image generated by OpenAI', 'NO_IMAGE_OUTPUT')
+      }
+
+      const imageData = response.data[0]
+      console.log(`✅ Image generation completed: ${imageData.url}`)
+      
       return {
-        id: task.id,
-        status: 'completed' as 'pending' | 'processing' | 'completed' | 'failed',
-        output: task.output
+        url: imageData.url,
+        revised_prompt: imageData.revised_prompt
       }
     } catch (error: any) {
       if (process.env.NODE_ENV !== 'test') {
         console.error(`❌ Image generation task failed:`, error)
       }
       
-      if (error instanceof TaskFailedError) {
+      if (error.error?.code === 'rate_limit_exceeded') {
         throw new ImageGenerationServiceError(
-          `Image generation task failed: ${error.message}`,
-          'TASK_FAILED'
-        )
-      }
-      if (error.message && error.message.includes('timeout')) {
-        throw new ImageGenerationServiceError(
-          'Image generation timed out',
-          'TIMEOUT'
+          'OpenAI rate limit exceeded',
+          'RATE_LIMIT_EXCEEDED'
         )
       }
       
-      // Log the full error for debugging
-      if (process.env.NODE_ENV !== 'test') {
-        console.error('Full error details:', {
-          message: error.message,
-          status: error.status,
-          error: error.error,
-          headers: error.headers
-        })
+      if (error.error?.code === 'content_policy_violation') {
+        throw new ImageGenerationServiceError(
+          'Image prompt violates content policy',
+          'CONTENT_POLICY_VIOLATION'
+        )
       }
       
       throw new ImageGenerationServiceError(

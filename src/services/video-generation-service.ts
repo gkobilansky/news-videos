@@ -143,55 +143,6 @@ export class VideoGenerationService {
     }
   }
 
-  // Legacy method for backward compatibility
-  async generateVideo(storyId: string, prompt: string, takeNumber?: number): Promise<VideoGenerationResult> {
-    if (!storyId || !storyId.trim()) {
-      throw new VideoGenerationServiceError('Story ID is required', 'INVALID_STORY_ID')
-    }
-
-    if (!prompt || !prompt.trim()) {
-      throw new VideoGenerationServiceError('Video prompt is required', 'INVALID_PROMPT')
-    }
-
-    try {
-      // Step 1: Generate image from text (using waitForTaskOutput)
-      const completedImageTask = await this.createImageGenerationTask(prompt.trim())
-      
-      if (!completedImageTask.output || completedImageTask.output.length === 0) {
-        throw new VideoGenerationServiceError('No image generated from text prompt', 'NO_IMAGE_OUTPUT')
-      }
-
-      // Step 2: Generate video from image (using waitForTaskOutput)
-      const completedVideoTask = await this.createVideoFromImageTask(completedImageTask.output[0], prompt.trim())
-      
-      if (!completedVideoTask.output || completedVideoTask.output.length === 0) {
-        throw new VideoGenerationServiceError('No video generated from image', 'NO_VIDEO_OUTPUT')
-      }
-      
-      // Download the generated video
-      const videoUrl = completedVideoTask.output[0]
-      const filepath = await this.downloadVideo(storyId, videoUrl, takeNumber)
-      
-      return {
-        videoPath: filepath,
-        allClips: [filepath], // Single clip for legacy method
-        duration: 10 // Default duration for single clip
-      }
-    } catch (error) {
-      if (error instanceof VideoGenerationServiceError) {
-        throw error
-      }
-      
-      if (process.env.NODE_ENV !== 'test') {
-        console.error('Video generation failed:', error)
-      }
-      throw new VideoGenerationServiceError(
-        'Failed to generate video',
-        'VIDEO_GENERATION_FAILED'
-      )
-    }
-  }
-
   async createVideoAsset(storyId: string, filepath: string, durationSec: number): Promise<Asset> {
     try {
       const relativePath = path.relative(process.cwd(), filepath)
@@ -516,7 +467,7 @@ export class VideoGenerationService {
         .select('*')
         .eq('story_id', storyId)
         .eq('kind', 'image')
-        .eq('provider', 'runway')
+        .eq('provider', 'openai')
         .order('created_at', { ascending: true })
 
       if (error) {

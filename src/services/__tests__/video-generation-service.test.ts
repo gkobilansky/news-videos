@@ -101,7 +101,7 @@ describe('VideoGenerationService', () => {
       mockFs.writeFile.mockResolvedValue(undefined)
       mockFs.mkdir.mockResolvedValue(undefined)
 
-      const result = await videoService.generateVideo(
+      const result = await videoService.generateVideoFromStory(
         'story-123',
         'A futuristic cityscape with flying cars and neon lights'
       )
@@ -139,11 +139,11 @@ describe('VideoGenerationService', () => {
       })
 
       await expect(
-        videoService.generateVideo('story-123', 'Test prompt')
+        videoService.generateVideoFromStoryboard('story-123', 'Test prompt')
       ).rejects.toThrow(VideoGenerationServiceError)
 
       await expect(
-        videoService.generateVideo('story-123', 'Test prompt')
+        videoService.generateVideoFromStoryboard('story-123', 'Test prompt')
       ).rejects.toThrow('Failed to create image generation task')
     })
 
@@ -169,7 +169,7 @@ describe('VideoGenerationService', () => {
         waitForTaskOutput: mockWaitForTaskOutputVideo
       })
 
-      const promise = videoService.generateVideo('story-123', 'Test prompt')
+      const promise = videoService.generateVideoFromStoryboard('story-123', 'Test prompt')
       
       await expect(promise).rejects.toThrow(VideoGenerationServiceError)
       await expect(promise).rejects.toThrow('Failed to create video generation task')
@@ -185,25 +185,25 @@ describe('VideoGenerationService', () => {
       })
 
       await expect(
-        videoService.generateVideo('story-123', 'Test prompt')
+        videoService.generateVideoFromStoryboard('story-123', 'Test prompt')
       ).rejects.toThrow(VideoGenerationServiceError)
 
       await expect(
-        videoService.generateVideo('story-123', 'Test prompt')
+        videoService.generateVideoFromStoryboard('story-123', 'Test prompt')
       ).rejects.toThrow('Image generation timed out')
     }, 15000)
 
     it('should validate input parameters', async () => {
       await expect(
-        videoService.generateVideo('', 'Valid prompt')
+        videoService.generateVideoFromStoryboard('', 'Valid prompt')
       ).rejects.toThrow(VideoGenerationServiceError)
 
       await expect(
-        videoService.generateVideo('story-123', '')
+        videoService.generateVideoFromStoryboard('story-123', '')
       ).rejects.toThrow(VideoGenerationServiceError)
 
       await expect(
-        videoService.generateVideo('story-123', '   ')
+        videoService.generateVideoFromStoryboard('story-123', '   ')
       ).rejects.toThrow(VideoGenerationServiceError)
     })
 

@@ -1,21 +1,14 @@
 import { ImageGenerationService, ImageGenerationServiceError } from '../image-generation-service'
 import { createMockStoryboard, createMockStory } from '../../lib/test-utils'
 
-// Mock RunwayML SDK
-jest.mock('@runwayml/sdk', () => ({
-  RunwayML: jest.fn().mockImplementation(() => ({
-    textToImage: {
-      create: jest.fn(() => ({
-        waitForTaskOutput: jest.fn()
-      }))
+// Mock OpenAI SDK
+jest.mock('openai', () => ({
+  __esModule: true,
+  default: jest.fn().mockImplementation(() => ({
+    images: {
+      generate: jest.fn()
     }
-  })),
-  TaskFailedError: class TaskFailedError extends Error {
-    constructor(message: string) {
-      super(message)
-      this.name = 'TaskFailedError'
-    }
-  }
+  }))
 }))
 
 // Mock Supabase
@@ -52,35 +45,33 @@ describe('ImageGenerationService', () => {
   let imageGenerationService: ImageGenerationService
   const mockStoryboard = createMockStoryboard()
   const mockStory = createMockStory()
-  let mockRunwayInstance: any
+  let mockOpenAIInstance: any
 
   beforeEach(() => {
     // Set up environment variable
-    process.env.RUNWAY_API_KEY = 'test-api-key'
+    process.env.OPENAI_API_KEY = 'test-api-key'
     
-    // Setup mock runway instance
-    const mockRunwayML = require('@runwayml/sdk').RunwayML
-    mockRunwayInstance = {
-      textToImage: {
-        create: jest.fn(() => ({
-          waitForTaskOutput: jest.fn()
-        }))
+    // Setup mock OpenAI instance
+    const MockOpenAI = require('openai').default
+    mockOpenAIInstance = {
+      images: {
+        generate: jest.fn()
       }
     }
-    mockRunwayML.mockImplementation(() => mockRunwayInstance)
+    MockOpenAI.mockImplementation(() => mockOpenAIInstance)
     
     imageGenerationService = new ImageGenerationService()
     jest.clearAllMocks()
   })
 
   afterEach(() => {
-    delete process.env.RUNWAY_API_KEY
+    delete process.env.OPENAI_API_KEY
   })
 
   describe('constructor', () => {
     it('should throw error if no API key is provided', () => {
-      delete process.env.RUNWAY_API_KEY
-      expect(() => new ImageGenerationService()).toThrow('Runway API key is required')
+      delete process.env.OPENAI_API_KEY
+      expect(() => new ImageGenerationService()).toThrow('OpenAI API key is required')
     })
 
     it('should initialize with valid API key', () => {
@@ -91,11 +82,11 @@ describe('ImageGenerationService', () => {
   describe('generateStoryboardImages', () => {
     it('should generate images for all shots in storyboard', async () => {
       // Mock successful image generation
-      mockRunwayInstance.textToImage.create.mockReturnValue({
-        waitForTaskOutput: jest.fn().mockResolvedValue({
-          id: 'test-task-id',
-          output: ['https://example.com/image1.jpg']
-        })
+      mockOpenAIInstance.images.generate.mockResolvedValue({
+        data: [{
+          url: 'https://example.com/image1.jpg',
+          revised_prompt: 'revised prompt'
+        }]
       })
 
       // Mock successful fetch
@@ -130,11 +121,11 @@ describe('ImageGenerationService', () => {
   describe('generateImageForShot', () => {
     it('should generate image for a single shot', async () => {
       // Mock successful image generation
-      mockRunwayInstance.textToImage.create.mockReturnValue({
-        waitForTaskOutput: jest.fn().mockResolvedValue({
-          id: 'test-task-id',
-          output: ['https://example.com/image1.jpg']
-        })
+      mockOpenAIInstance.images.generate.mockResolvedValue({
+        data: [{
+          url: 'https://example.com/image1.jpg',
+          revised_prompt: 'revised prompt'
+        }]
       })
 
       // Mock successful fetch
@@ -167,11 +158,11 @@ describe('ImageGenerationService', () => {
   describe('generateImage', () => {
     it('should generate standalone image', async () => {
       // Mock successful image generation
-      mockRunwayInstance.textToImage.create.mockReturnValue({
-        waitForTaskOutput: jest.fn().mockResolvedValue({
-          id: 'test-task-id',
-          output: ['https://example.com/image1.jpg']
-        })
+      mockOpenAIInstance.images.generate.mockResolvedValue({
+        data: [{
+          url: 'https://example.com/image1.jpg',
+          revised_prompt: 'revised prompt'
+        }]
       })
 
       // Mock successful fetch
@@ -245,11 +236,9 @@ describe('ImageGenerationService', () => {
   })
 
   describe('error handling', () => {
-    it('should handle Runway API errors', async () => {
+    it('should handle OpenAI API errors', async () => {
       // Mock API error
-      mockRunwayInstance.textToImage.create.mockReturnValue({
-        waitForTaskOutput: jest.fn().mockRejectedValue(new Error('API Error'))
-      })
+      mockOpenAIInstance.images.generate.mockRejectedValue(new Error('API Error'))
 
       const shot = mockStoryboard.shots[0]
       await expect(imageGenerationService.generateImageForShot(mockStory.id, shot, 1))
@@ -259,11 +248,11 @@ describe('ImageGenerationService', () => {
 
     it('should handle download errors', async () => {
       // Mock successful image generation
-      mockRunwayInstance.textToImage.create.mockReturnValue({
-        waitForTaskOutput: jest.fn().mockResolvedValue({
-          id: 'test-task-id',
-          output: ['https://example.com/image1.jpg']
-        })
+      mockOpenAIInstance.images.generate.mockResolvedValue({
+        data: [{
+          url: 'https://example.com/image1.jpg',
+          revised_prompt: 'revised prompt'
+        }]
       })
 
       // Mock failed fetch
